@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Sch&uuml;ler — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Sch&uuml;ler verwalten</h2>
+        <p>{{ students|length }} Sch&uuml;ler insgesamt</p>
+    </div>
+    <a href="{{ url_for('add_student') }}" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</a>
+</div>
+
+{% if students %}
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Nr.</th>
+                <th>Nachname</th>
+                <th>Vorname</th>
+                <th>Geschlecht</th>
+                <th>Religion</th>
+                <th>Sportlich</th>
+                <th>F&ouml;rderbedarf</th>
+                <th>Notizen</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><strong>{{ student.lastname }}</strong></td>
+                <td>{{ student.firstname }}</td>
+                <td>
+                    {% if student.gender == 'm' %}
+                        M&auml;nnlich
+                    {% elif student.gender == 'w' %}
+                        Weiblich
+                    {% else %}
+                        Divers
+                    {% endif %}
+                </td>
+                <td>
+                    {% if student.religion == 'ethik' %}
+                        Ethik
+                    {% elif student.religion == 'katholisch' %}
+                        Katholisch
+                    {% elif student.religion == 'evangelisch' %}
+                        Evangelisch
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>{% if student.sportlich %}Ja{% else %}—{% endif %}</td>
+                <td>
+                    {% if student.special_needs == 'hoerschaedigung' %}
+                        H&ouml;rsch&auml;digung
+                    {% elif student.special_needs == 'sprache' %}
+                        Sprache
+                    {% elif student.special_needs == 'sozial_emotional' %}
+                        Sozial/Emotional
+                    {% elif student.special_needs == 'lernen' %}
+                        Lernen
+                    {% elif student.special_needs %}
+                        {{ student.special_needs }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>{{ student.notes or '—' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_student', student_id=student.id) }}" class="inline-form" onsubmit="return confirm('Sch\u00fcler wirklich l\u00f6schen?');">
+                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>Noch keine Sch&uuml;ler vorhanden</h3>
+    <p>F&uuml;gen Sie Sch&uuml;ler hinzu, um mit der Klasseneinteilung zu beginnen.</p>
+    <a href="{{ url_for('add_student') }}" class="btn btn-primary">Ersten Sch&uuml;ler hinzuf&uuml;gen</a>
+</div>
+{% endif %}
+{% endblock %}

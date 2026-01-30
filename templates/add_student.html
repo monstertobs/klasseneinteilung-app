@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Sch&uuml;ler hinzuf&uuml;gen — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Sch&uuml;ler hinzuf&uuml;gen</h2>
+</div>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('add_student') }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="firstname">Vorname</label>
+                <input type="text" id="firstname" name="firstname" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label for="lastname">Nachname</label>
+                <input type="text" id="lastname" name="lastname" class="form-control" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="gender">Geschlecht</label>
+            <select id="gender" name="gender" class="form-control">
+                <option value="">Bitte w&auml;hlen</option>
+                <option value="m">M&auml;nnlich</option>
+                <option value="w">Weiblich</option>
+                <option value="d">Divers</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="religion">Religion</label>
+            <select id="religion" name="religion" class="form-control">
+                <option value="">Bitte w&auml;hlen</option>
+                <option value="ethik">Ethik</option>
+                <option value="katholisch">Katholische Religion</option>
+                <option value="evangelisch">Evangelische Religion</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="sportlich" value="1">
+                Besonders sportlich (Sportklasse)
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label for="special_needs">Inklusiver F&ouml;rderbedarf</label>
+            <select id="special_needs" name="special_needs" class="form-control">
+                <option value="">Keiner</option>
+                <option value="hoerschaedigung">H&ouml;rsch&auml;digung</option>
+                <option value="sprache">Sprache</option>
+                <option value="sozial_emotional">Sozial/Emotional</option>
+                <option value="lernen">Lernen</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Notizen</label>
+            <textarea id="notes" name="notes" class="form-control" rows="3"
+                      placeholder="Zus&auml;tzliche Informationen"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('students') }}" class="btn btn-secondary">Abbrechen</a>
+            <button type="submit" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

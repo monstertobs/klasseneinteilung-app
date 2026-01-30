@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Dashboard</h2>
+        <p>Willkommen, {{ session.username }}</p>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-content">
+            <h3>{{ student_count }}</h3>
+            <p>Sch&uuml;ler</p>
+        </div>
+        <a href="{{ url_for('students') }}" class="stat-link">Verwalten &rarr;</a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-content">
+            <h3>{{ wish_count }}</h3>
+            <p>Elternw&uuml;nsche</p>
+        </div>
+        <a href="{{ url_for('wishes') }}" class="stat-link">Verwalten &rarr;</a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-content">
+            <h3>{{ assignment_count }}</h3>
+            <p>Einteilungen</p>
+        </div>
+        <a href="{{ url_for('assignments') }}" class="stat-link">Ansehen &rarr;</a>
+    </div>
+</div>
+
+<div class="quick-actions">
+    <h3>Schnellaktionen</h3>
+    <div class="action-grid">
+        <a href="{{ url_for('add_student') }}" class="action-card">
+            <span class="action-text">Sch&uuml;ler hinzuf&uuml;gen</span>
+        </a>
+
+        <a href="{{ url_for('add_wish') }}" class="action-card">
+            <span class="action-text">Elternwunsch hinzuf&uuml;gen</span>
+        </a>
+
+        <a href="{{ url_for('generate') }}" class="action-card highlight">
+            <span class="action-text">Klasseneinteilung generieren</span>
+        </a>
+    </div>
+</div>
+
+<div class="info-section">
+    <h3>Informationen</h3>
+    <div class="info-box">
+        <h4>Workflow</h4>
+        <ol>
+            <li><strong>Sch&uuml;ler erfassen:</strong> F&uuml;gen Sie alle Sch&uuml;ler der neuen 5. Klassen hinzu</li>
+            <li><strong>Elternw&uuml;nsche eintragen:</strong> Erfassen Sie W&uuml;nsche wie &bdquo;zusammen&ldquo; oder &bdquo;getrennt&ldquo;</li>
+            <li><strong>Einteilung generieren:</strong> Lassen Sie 3 verschiedene Vorschl&auml;ge erstellen</li>
+            <li><strong>Anpassen &amp; speichern:</strong> W&auml;hlen Sie den besten Vorschlag aus</li>
+        </ol>
+    </div>
+
+    <div class="info-box">
+        <h4>Datenschutz</h4>
+        <p>Alle Daten werden ausschlie&szlig;lich auf Ihrem Server gespeichert. Es erfolgt keine &Uuml;bertragung an Dritte. Die Anwendung ist DSGVO-konform.</p>
+    </div>
+</div>
+{% endblock %}

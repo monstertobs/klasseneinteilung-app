@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Elternw&uuml;nsche — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Elternw&uuml;nsche verwalten</h2>
+        <p>{{ wishes|length }} W&uuml;nsche insgesamt</p>
+    </div>
+    <a href="{{ url_for('add_wish') }}" class="btn btn-primary">Wunsch hinzuf&uuml;gen</a>
+</div>
+
+{% if wishes %}
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Nr.</th>
+                <th>Sch&uuml;ler</th>
+                <th>Wunsch-Typ</th>
+                <th>Bezugsperson</th>
+                <th>Beschreibung</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for wish in wishes %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><strong>{{ wish.student_name }}</strong></td>
+                <td>
+                    {% if wish.wish_type == 'together' %}
+                        <span class="badge badge-success">Zusammen</span>
+                    {% elif wish.wish_type == 'separated' %}
+                        <span class="badge badge-warning">Getrennt</span>
+                    {% else %}
+                        <span class="badge badge-info">{{ wish.wish_type }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ wish.related_student_name or '—' }}</td>
+                <td>{{ wish.description or '—' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_wish', wish_id=wish.id) }}" class="inline-form" onsubmit="return confirm('Wunsch wirklich l\u00f6schen?');">
+                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>Noch keine Elternw&uuml;nsche vorhanden</h3>
+    <p>F&uuml;gen Sie Elternw&uuml;nsche hinzu, um die Klasseneinteilung zu optimieren.</p>
+    <a href="{{ url_for('add_wish') }}" class="btn btn-primary">Ersten Wunsch hinzuf&uuml;gen</a>
+</div>
+{% endif %}
+{% endblock %}

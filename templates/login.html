@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Anmelden — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-box">
+        <div class="login-header">
+            <h2>Klasseneinteilung</h2>
+            <p>Bitte melden Sie sich an</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('login') }}" class="login-form">
+            <div class="form-group">
+                <label for="username">Benutzername</label>
+                <input type="text" id="username" name="username" class="form-control" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
+        </form>
+
+        <div class="login-info">
+            <p><strong>Erstanmeldung:</strong></p>
+            <p>Benutzer: <code>admin</code> &middot; Passwort: <code>admin123</code></p>
+            <p class="text-small">Bitte &auml;ndern Sie das Passwort nach der ersten Anmeldung.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

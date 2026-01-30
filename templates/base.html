@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Klasseneinteilung{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% if session.user_id %}
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-brand">
+                <h1>Klasseneinteilung</h1>
+            </div>
+            <ul class="navbar-menu">
+                <li><a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>
+                <li><a href="{{ url_for('students') }}" {% if request.endpoint in ['students', 'add_student'] %}class="active"{% endif %}>Sch&uuml;ler</a></li>
+                <li><a href="{{ url_for('wishes') }}" {% if request.endpoint in ['wishes', 'add_wish'] %}class="active"{% endif %}>Elternw&uuml;nsche</a></li>
+                <li><a href="{{ url_for('generate') }}" {% if request.endpoint == 'generate' %}class="active"{% endif %}>Einteilung</a></li>
+                <li><a href="{{ url_for('users') }}" {% if request.endpoint in ['users', 'add_user'] %}class="active"{% endif %}>Benutzer</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout">Abmelden</a></li>
+            </ul>
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="container main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <span>{{ message }}</span>
+                        <button class="alert-close" onclick="this.parentElement.style.opacity='0';this.parentElement.style.transform='translateY(-8px)';setTimeout(()=>this.parentElement.remove(),300)">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Klasseneinteilung &middot; DSGVO-konform &middot; Lokale Datenspeicherung</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

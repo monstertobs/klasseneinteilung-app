@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Einteilung generieren — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Klasseneinteilung generieren</h2>
+        <p>{{ proposals[0].statistics.total_students }} Sch&uuml;ler auf {{ num_classes }} Klassen verteilen</p>
+    </div>
+</div>
+
+<div class="options-panel" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
+    <h4 style="margin-top: 0;">Einteilungsoptionen</h4>
+    <form method="POST" action="{{ url_for('generate') }}">
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="gender_balance" value="1" {% if options.gender_balance %}checked{% endif %}>
+                Geschlechterverteilung ber&uuml;cksichtigen
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="parent_wishes" value="1" {% if options.parent_wishes %}checked{% endif %}>
+                Elternw&uuml;nsche ber&uuml;cksichtigen
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="religion_distribute" id="religion_distribute" value="1" {% if options.religion_distribute %}checked{% endif %}>
+                Religion gleichm&auml;&szlig;ig verteilen
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="religion_group" id="religion_group" value="1" {% if options.religion_group %}checked{% endif %}>
+                Religion zusammen gruppieren
+            </label>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-top: 0.75rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="sportklasse" value="1" {% if options.sportklasse %}checked{% endif %}>
+                Sportklasse (Klasse 1)
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                Max. Inklusionskinder pro Klasse:
+                <input type="number" name="max_inklusion" min="0" max="20" value="{{ options.max_inklusion }}" style="width: 4rem;" class="form-control">
+                <span style="color: #6c757d; font-size: 0.875rem;">(0 = kein Limit)</span>
+            </label>
+        </div>
+
+        <div style="margin-top: 1rem;">
+            <button type="submit" class="btn btn-primary">Neu generieren</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Religion verteilen und gruppieren schließen sich gegenseitig aus
+    const distCheckbox = document.getElementById('religion_distribute');
+    const groupCheckbox = document.getElementById('religion_group');
+
+    distCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            groupCheckbox.checked = false;
+        }
+    });
+
+    groupCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            distCheckbox.checked = false;
+        }
+    });
+</script>
+
+<div class="proposals-container">
+    {% for proposal in proposals %}
+    <div class="proposal-card">
+        <div class="proposal-header">
+            <h3>Vorschlag {{ loop.index }}</h3>
+            <div class="proposal-stats">
+                <span class="stat">{{ proposal.statistics.total_students }} Sch&uuml;ler</span>
+                <span class="stat">{{ num_classes }} Klassen</span>
+            </div>
+        </div>
+
+        <div class="classes-grid">
+            {% for class in proposal.classes %}
+            <div class="class-card">
+                <div class="class-header">
+                    <h4>Klasse {{ class.number }}{% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}</h4>
+                    <span class="class-count">{{ class.count }} Sch&uuml;ler</span>
+                </div>
+
+                <div class="gender-distribution">
+                    <span class="gender-stat">M {{ class.gender_count.m }}</span>
+                    <span class="gender-stat">W {{ class.gender_count.w }}</span>
+                    <span class="gender-stat">D {{ class.gender_count.d }}</span>
+                </div>
+
+                <div class="gender-distribution" style="margin-top: 0.25rem;">
+                    <span class="gender-stat" title="Ethik">E {{ class.religion_count.ethik }}</span>
+                    <span class="gender-stat" title="Katholisch">K {{ class.religion_count.katholisch }}</span>
+                    <span class="gender-stat" title="Evangelisch">Ev {{ class.religion_count.evangelisch }}</span>
+                    <span class="gender-stat" title="Inklusionskinder">Inkl {{ class.inklusion_count }}</span>
+                    <span class="gender-stat" title="Sportliche Sch&uuml;ler">Sport {{ class.sport_count }}</span>
+                </div>
+
+                <div class="student-list">
+                    {% for student in class.students %}
+                    <div class="student-item">
+                        {{ student.lastname }}, {{ student.firstname }}
+                        {% if student.special_needs == 'hoerschaedigung' %}
+                        <span class="special-badge" title="H&ouml;rsch&auml;digung" style="background: #dc3545;">H</span>
+                        {% elif student.special_needs == 'sprache' %}
+                        <span class="special-badge" title="Sprache" style="background: #fd7e14;">S</span>
+                        {% elif student.special_needs == 'sozial_emotional' %}
+                        <span class="special-badge" title="Sozial/Emotional" style="background: #6f42c1;">SE</span>
+                        {% elif student.special_needs == 'lernen' %}
+                        <span class="special-badge" title="Lernen" style="background: #0d6efd;">L</span>
+                        {% elif student.special_needs %}
+                        <span class="special-badge" title="{{ student.special_needs }}">!</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="proposal-actions">
+            <button class="btn btn-secondary" onclick="window.print()">Drucken</button>
+            <button class="btn btn-primary">Ausw&auml;hlen</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="info-box">
+    <h4>Hinweise zur Einteilung</h4>
+    <ul>
+        <li>Die drei Vorschl&auml;ge ber&uuml;cksichtigen die oben gew&auml;hlten Optionen</li>
+        <li>F&ouml;rderbedarf: <strong>H</strong> = H&ouml;rsch&auml;digung, <strong>S</strong> = Sprache, <strong>SE</strong> = Sozial/Emotional, <strong>L</strong> = Lernen</li>
+        <li>E = Ethik, K = Katholisch, Ev = Evangelisch</li>
+        <li>&Auml;ndern Sie die Optionen und klicken Sie &bdquo;Neu generieren&ldquo; f&uuml;r andere Ergebnisse</li>
+    </ul>
+</div>
+{% endblock %}

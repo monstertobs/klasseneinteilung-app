@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Benutzerverwaltung — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Benutzerverwaltung</h2>
+        <p>{{ users|length }} von 10 Benutzern</p>
+    </div>
+    {% if users|length < 10 %}
+    <a href="{{ url_for('add_user') }}" class="btn btn-primary">Benutzer hinzuf&uuml;gen</a>
+    {% endif %}
+</div>
+
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Nr.</th>
+                <th>Benutzername</th>
+                <th>Erstellt am</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>
+                    <strong>{{ user.username }}</strong>
+                    {% if user.id == session.user_id %}
+                    <span class="badge badge-info">Sie</span>
+                    {% endif %}
+                </td>
+                <td>{{ user.created_at }}</td>
+                <td>
+                    {% if user.id != session.user_id %}
+                    <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Benutzer wirklich l\u00f6schen?');">
+                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                    </form>
+                    {% else %}
+                    <span class="text-muted">&mdash;</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="info-box" style="margin-top: 1.5rem;">
+    <h4>Hinweise zur Benutzerverwaltung</h4>
+    <ul>
+        <li>Es k&ouml;nnen maximal 10 Benutzer angelegt werden</li>
+        <li>Jeder Benutzer ben&ouml;tigt einen eindeutigen Benutzernamen</li>
+        <li>Passw&ouml;rter m&uuml;ssen mindestens 6 Zeichen lang sein</li>
+        <li>Sie k&ouml;nnen sich nicht selbst l&ouml;schen</li>
+        <li>&Auml;ndern Sie das Standard-Passwort nach der ersten Anmeldung</li>
+    </ul>
+</div>
+{% endblock %}

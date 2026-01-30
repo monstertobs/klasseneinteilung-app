@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Einteilungen — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Gespeicherte Einteilungen</h2>
+        <p>{{ assignments|length }} Einteilungen gespeichert</p>
+    </div>
+</div>
+
+{% if assignments %}
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Nr.</th>
+                <th>Name</th>
+                <th>Erstellt von</th>
+                <th>Erstellt am</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for assignment in assignments %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><strong>{{ assignment.name }}</strong></td>
+                <td>{{ assignment.username }}</td>
+                <td>{{ assignment.created_at }}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm">Ansehen</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>Noch keine Einteilungen gespeichert</h3>
+    <p>Generieren Sie Klasseneinteilungen und speichern Sie Ihre Favoriten.</p>
+    <a href="{{ url_for('generate') }}" class="btn btn-primary">Einteilung generieren</a>
+</div>
+{% endif %}
+{% endblock %}
