@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Serverfehler - Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center; padding: 60px 40px;">
+    <div style="font-size: 72px; margin-bottom: 20px;">⚠️</div>
+    <h2>Interner Serverfehler</h2>
+    <p style="color: var(--text-secondary); margin: 20px 0;">
+        Es ist ein unerwarteter Fehler aufgetreten.<br>
+        Bitte versuchen Sie es erneut oder kontaktieren Sie den Administrator.
+    </p>
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Zurück zum Dashboard</a>
+    </div>
+</div>
+{% endblock %}

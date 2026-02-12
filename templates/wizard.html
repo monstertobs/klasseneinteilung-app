@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+
+{% block title %}Einteilungs-Assistent — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+    <!-- Wizard Header -->
+    <div class="wizard-header">
+        <h1>🧙‍♂️ Einteilungs-Assistent</h1>
+        <p>Schritt {{ step }} von 5</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="wizard-progress">
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ (step / 5 * 100)|round }}%;"></div>
+        </div>
+        <div class="progress-steps">
+            <div class="progress-step {% if step >= 1 %}active{% endif %} {% if step > 1 %}completed{% endif %}">
+                <div class="step-circle">1</div>
+                <div class="step-label">Start</div>
+            </div>
+            <div class="progress-step {% if step >= 2 %}active{% endif %} {% if step > 2 %}completed{% endif %}">
+                <div class="step-circle">2</div>
+                <div class="step-label">Sch&uuml;ler</div>
+            </div>
+            <div class="progress-step {% if step >= 3 %}active{% endif %} {% if step > 3 %}completed{% endif %}">
+                <div class="step-circle">3</div>
+                <div class="step-label">W&uuml;nsche</div>
+            </div>
+            <div class="progress-step {% if step >= 4 %}active{% endif %} {% if step > 4 %}completed{% endif %}">
+                <div class="step-circle">4</div>
+                <div class="step-label">Generieren</div>
+            </div>
+            <div class="progress-step {% if step >= 5 %}active{% endif %}">
+                <div class="step-circle">5</div>
+                <div class="step-label">Fertig</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step Content -->
+    <div class="wizard-content">
+        {% if step == 1 %}
+            <!-- Schritt 1: Willkommen -->
+            <div class="wizard-step-content">
+                <h2>Willkommen beim Einteilungs-Assistenten!</h2>
+                <p style="font-size: 1.1rem; margin-bottom: 2rem;">Dieser Assistent f&uuml;hrt Sie Schritt f&uuml;r Schritt durch den kompletten Prozess der Klasseneinteilung.</p>
+
+                <div class="info-box">
+                    <h3>📋 Was Sie erwartet:</h3>
+                    <ol style="line-height: 2;">
+                        <li><strong>Sch&uuml;ler hinzuf&uuml;gen</strong> - Einzeln oder per Import</li>
+                        <li><strong>Elternw&uuml;nsche erfassen</strong> - Optional, aber empfohlen</li>
+                        <li><strong>Optionen w&auml;hlen</strong> - Geschlechterbalance, Religion, etc.</li>
+                        <li><strong>Einteilung generieren</strong> - 3 Vorschl&auml;ge werden erstellt</li>
+                        <li><strong>Speichern & Fertig</strong> - Beste Einteilung ausw&auml;hlen</li>
+                    </ol>
+                </div>
+
+                <div class="info-box" style="background: #fff3cd; border-color: #ffc107;">
+                    <h3>💡 Gut zu wissen:</h3>
+                    <ul style="line-height: 1.8;">
+                        <li>Sie k&ouml;nnen jederzeit abbrechen und sp&auml;ter fortfahren</li>
+                        <li>Bereits erfasste Daten bleiben gespeichert</li>
+                        <li>Der Assistent &uuml;berspringt Schritte, die bereits erledigt sind</li>
+                        <li>Gesch&auml;tzte Zeit: <strong>10-15 Minuten</strong></li>
+                    </ul>
+                </div>
+
+                <div class="wizard-actions">
+                    <a href="{{ url_for('wizard_cancel') }}" class="btn btn-secondary">Abbrechen</a>
+                    <a href="{{ url_for('wizard_step', step=2) }}" class="btn btn-primary">Los geht's! →</a>
+                </div>
+            </div>
+
+        {% elif step == 2 %}
+            <!-- Schritt 2: Schüler -->
+            <div class="wizard-step-content">
+                <h2>Schritt 2: Sch&uuml;ler hinzuf&uuml;gen</h2>
+
+                <div class="status-card {% if student_count > 0 %}success{% else %}warning{% endif %}">
+                    <h3>
+                        {% if student_count > 0 %}✅{% else %}⏳{% endif %}
+                        Status: {{ student_count }} Sch&uuml;ler erfasst
+                    </h3>
+                    {% if student_count > 0 %}
+                        <p>Super! Sie haben bereits {{ student_count }} Sch&uuml;ler in der Datenbank.</p>
+                    {% else %}
+                        <p>Sie haben noch keine Sch&uuml;ler erfasst. Bitte f&uuml;gen Sie Sch&uuml;ler hinzu.</p>
+                    {% endif %}
+                </div>
+
+                <div class="action-cards">
+                    <div class="action-card">
+                        <h3>📝 Einzeln hinzuf&uuml;gen</h3>
+                        <p>F&uuml;gen Sie Sch&uuml;ler manuell einzeln hinzu</p>
+                        <a href="{{ url_for('add_student') }}" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</a>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>📁 CSV/Excel importieren</h3>
+                        <p>Importieren Sie mehrere Sch&uuml;ler auf einmal</p>
+                        <a href="{{ url_for('import_students') }}" class="btn btn-primary">Importieren</a>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>👀 &Uuml;bersicht anzeigen</h3>
+                        <p>Alle erfassten Sch&uuml;ler ansehen und bearbeiten</p>
+                        <a href="{{ url_for('students') }}" class="btn btn-secondary">Zur Liste</a>
+                    </div>
+                </div>
+
+                <div class="wizard-actions">
+                    <a href="{{ url_for('wizard_step', step=1) }}" class="btn btn-secondary">← Zur&uuml;ck</a>
+                    <a href="{{ url_for('wizard_cancel') }}" class="btn btn-outline">Abbrechen</a>
+                    {% if student_count >= 10 %}
+                        <a href="{{ url_for('wizard_step', step=3) }}" class="btn btn-primary">Weiter →</a>
+                    {% else %}
+                        <button class="btn btn-disabled" disabled title="Mindestens 10 Schüler erforderlich">Weiter (min. 10 Sch&uuml;ler) →</button>
+                    {% endif %}
+                </div>
+            </div>
+
+        {% elif step == 3 %}
+            <!-- Schritt 3: Elternwünsche -->
+            <div class="wizard-step-content">
+                <h2>Schritt 3: Elternw&uuml;nsche (Optional)</h2>
+
+                <div class="status-card info">
+                    <h3>ℹ️ Status: {{ wish_count }} W&uuml;nsche erfasst</h3>
+                    <p>Elternw&uuml;nsche helfen bei einer optimalen Einteilung, sind aber optional.</p>
+                </div>
+
+                <div class="action-cards">
+                    <div class="action-card">
+                        <h3>➕ Wunsch hinzuf&uuml;gen</h3>
+                        <p>Erfassen Sie "Zusammen"- oder "Getrennt"-W&uuml;nsche</p>
+                        <a href="{{ url_for('add_wish') }}" class="btn btn-primary">Wunsch hinzuf&uuml;gen</a>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>📋 W&uuml;nsche &uuml;berpr&uuml;fen</h3>
+                        <p>Alle erfassten W&uuml;nsche ansehen und bearbeiten</p>
+                        <a href="{{ url_for('wishes') }}" class="btn btn-secondary">Zur Liste</a>
+                    </div>
+                </div>
+
+                <div class="wizard-actions">
+                    <a href="{{ url_for('wizard_step', step=2) }}" class="btn btn-secondary">← Zur&uuml;ck</a>
+                    <a href="{{ url_for('wizard_cancel') }}" class="btn btn-outline">Abbrechen</a>
+                    <a href="{{ url_for('wizard_step', step=4) }}" class="btn btn-primary">Weiter (W&uuml;nsche {{ 'berücksichtigen' if wish_count > 0 else 'überspringen' }}) →</a>
+                </div>
+            </div>
+
+        {% elif step == 4 %}
+            <!-- Schritt 4: Generieren -->
+            <div class="wizard-step-content">
+                <h2>Schritt 4: Klasseneinteilung generieren</h2>
+
+                <div class="status-card success">
+                    <h3>✅ Bereit zur Generierung!</h3>
+                    <p>Sie haben <strong>{{ student_count }} Sch&uuml;ler</strong> und <strong>{{ wish_count }} W&uuml;nsche</strong> erfasst.</p>
+                </div>
+
+                <div class="info-box">
+                    <h3>🎯 Was passiert jetzt?</h3>
+                    <ul style="line-height: 1.8;">
+                        <li>Der Algorithmus erstellt <strong>3 verschiedene Vorschl&auml;ge</strong></li>
+                        <li>Jeder Vorschlag ber&uuml;cksichtigt Ihre Einstellungen</li>
+                        <li>Sie k&ouml;nnen den besten Vorschlag ausw&auml;hlen</li>
+                        <li>Die Generierung dauert nur wenige Sekunden</li>
+                    </ul>
+                </div>
+
+                <div class="action-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 2rem;">
+                    <h3 style="color: white; margin-top: 0;">🚀 Jetzt generieren!</h3>
+                    <p style="color: rgba(255,255,255,0.9);">Klicken Sie auf "Generieren", um zur Einteilungsseite zu gelangen</p>
+                    <a href="{{ url_for('generate') }}" class="btn" style="background: white; color: #667eea; font-weight: 600;">Zur Generierung →</a>
+                </div>
+
+                <div class="wizard-actions">
+                    <a href="{{ url_for('wizard_step', step=3) }}" class="btn btn-secondary">← Zur&uuml;ck</a>
+                    <a href="{{ url_for('wizard_cancel') }}" class="btn btn-outline">Abbrechen</a>
+                    <a href="{{ url_for('wizard_step', step=5) }}" class="btn btn-outline">Ich habe bereits generiert →</a>
+                </div>
+            </div>
+
+        {% elif step == 5 %}
+            <!-- Schritt 5: Fertig -->
+            <div class="wizard-step-content">
+                <h2>🎉 Fertig!</h2>
+
+                <div class="success-message">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
+                    <h3>Gl&uuml;ckwunsch!</h3>
+                    <p style="font-size: 1.2rem;">Sie haben erfolgreich eine Klasseneinteilung erstellt!</p>
+                </div>
+
+                <div class="info-box">
+                    <h3>📋 N&auml;chste Schritte:</h3>
+                    <ul style="line-height: 1.8;">
+                        <li>Pr&uuml;fen Sie die gespeicherten Einteilungen</li>
+                        <li>Exportieren oder drucken Sie die Listen</li>
+                        <li>Bei Bedarf k&ouml;nnen Sie neue Einteilungen generieren</li>
+                    </ul>
+                </div>
+
+                <div class="action-cards">
+                    <div class="action-card">
+                        <h3>📊 Einteilungen ansehen</h3>
+                        <p>Alle gespeicherten Klasseneinteilungen &uuml;berpr&uuml;fen</p>
+                        <a href="{{ url_for('wizard_complete') }}" class="btn btn-primary">Zu den Einteilungen</a>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>🔄 Neu starten</h3>
+                        <p>Eine weitere Einteilung mit anderen Optionen erstellen</p>
+                        <a href="{{ url_for('wizard_restart') }}" class="btn btn-secondary">Wizard neu starten</a>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>🏠 Zum Dashboard</h3>
+                        <p>Zur&uuml;ck zur Haupt&uuml;bersicht</p>
+                        <a href="{{ url_for('wizard_cancel') }}" class="btn btn-outline">Zum Dashboard</a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.wizard-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.wizard-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.wizard-header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.wizard-progress {
+    margin-bottom: 3rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+}
+
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+}
+
+.progress-step {
+    text-align: center;
+    flex: 1;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.progress-step.active .step-circle {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: scale(1.1);
+}
+
+.progress-step.completed .step-circle {
+    background: #28a745;
+    color: white;
+}
+
+.step-label {
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.wizard-content {
+    background: white;
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.wizard-step-content h2 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #333;
+}
+
+.status-card {
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    border: 2px solid;
+}
+
+.status-card.success {
+    background: #d4edda;
+    border-color: #28a745;
+}
+
+.status-card.warning {
+    background: #fff3cd;
+    border-color: #ffc107;
+}
+
+.status-card.info {
+    background: #d1ecf1;
+    border-color: #17a2b8;
+}
+
+.status-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.info-box {
+    background: #e3f2fd;
+    border: 2px solid #2196f3;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.info-box h3 {
+    margin-top: 0;
+    color: #1976d2;
+}
+
+.action-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.action-card {
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.action-card h3 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    margin-bottom: 0.75rem;
+}
+
+.action-card p {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.wizard-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid #dee2e6;
+    color: #666;
+}
+
+.btn-outline:hover {
+    background: #f8f9fa;
+}
+
+.btn-disabled {
+    background: #e0e0e0;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.success-message {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-radius: 12px;
+    margin-bottom: 2rem;
+}
+
+.success-message h3 {
+    color: #155724;
+    font-size: 2rem;
+    margin: 1rem 0;
+}
+
+@media (max-width: 768px) {
+    .wizard-actions {
+        flex-direction: column;
+    }
+
+    .action-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .progress-steps {
+        font-size: 0.8rem;
+    }
+
+    .step-circle {
+        width: 30px;
+        height: 30px;
+        font-size: 0.85rem;
+    }
+}
+</style>
+{% endblock %}

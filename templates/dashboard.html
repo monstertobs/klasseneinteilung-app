@@ -10,6 +10,50 @@
     </div>
 </div>
 
+{% if wizard_active %}
+<div class="wizard-banner">
+    <div class="wizard-banner-content">
+        <h3>🧙‍♂️ Wizard aktiv - Schritt {{ wizard_step }} von 5</h3>
+        <p>Sie befinden sich im Einteilungs-Assistenten</p>
+    </div>
+    <div class="wizard-banner-actions">
+        <a href="{{ url_for('wizard_step', step=wizard_step) }}" class="btn btn-primary">Fortsetzen</a>
+        <a href="{{ url_for('wizard_cancel') }}" class="btn btn-outline">Abbrechen</a>
+    </div>
+</div>
+{% else %}
+<div class="mode-selection">
+    <h3 style="text-align: center; margin-bottom: 1.5rem;">Wie möchten Sie vorgehen?</h3>
+    <div class="mode-cards">
+        <div class="mode-card wizard-mode">
+            <div class="mode-icon">🧙‍♂️</div>
+            <h3>Geführter Assistent</h3>
+            <p>Schritt-für-Schritt Anleitung durch den kompletten Prozess. Ideal für Erstnutzer!</p>
+            <ul class="mode-features">
+                <li>✓ Schritt-für-Schritt Führung</li>
+                <li>✓ Hilfe bei jedem Schritt</li>
+                <li>✓ Jederzeit abbrechbar</li>
+                <li>✓ Empfohlen für Einsteiger</li>
+            </ul>
+            <a href="{{ url_for('wizard') }}" class="btn btn-primary btn-large">Wizard starten</a>
+        </div>
+
+        <div class="mode-card manual-mode">
+            <div class="mode-icon">⚡</div>
+            <h3>Manuelle Bearbeitung</h3>
+            <p>Direkter Zugriff auf alle Funktionen. Für erfahrene Nutzer!</p>
+            <ul class="mode-features">
+                <li>✓ Freie Navigation</li>
+                <li>✓ Alle Funktionen direkt erreichbar</li>
+                <li>✓ Maximale Flexibilität</li>
+                <li>✓ Schneller für Experten</li>
+            </ul>
+            <div class="btn btn-secondary btn-large" style="cursor: default;">Manuelle Aktionen unten ↓</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-content">
@@ -70,4 +114,141 @@
         <p>Alle Daten werden ausschlie&szlig;lich auf Ihrem Server gespeichert. Es erfolgt keine &Uuml;bertragung an Dritte. Die Anwendung ist DSGVO-konform.</p>
     </div>
 </div>
+
+<style>
+.wizard-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+}
+
+.wizard-banner h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.3rem;
+}
+
+.wizard-banner p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+.wizard-banner-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.wizard-banner .btn {
+    white-space: nowrap;
+}
+
+.wizard-banner .btn-outline {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border-color: rgba(255,255,255,0.4);
+}
+
+.wizard-banner .btn-outline:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.mode-selection {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+}
+
+.mode-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.mode-card {
+    background: #f8f9fa;
+    border: 3px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.mode-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.wizard-mode {
+    border-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+}
+
+.wizard-mode:hover {
+    border-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.mode-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.mode-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+}
+
+.mode-card p {
+    color: #666;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.mode-features {
+    text-align: left;
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0;
+}
+
+.mode-features li {
+    padding: 0.5rem 0;
+    color: #555;
+}
+
+.btn-large {
+    padding: 0.85rem 2rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .wizard-banner {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .wizard-banner-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .wizard-banner-actions .btn {
+        width: 100%;
+    }
+
+    .mode-cards {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 {% endblock %}

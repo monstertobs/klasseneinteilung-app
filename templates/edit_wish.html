@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Elternwunsch hinzuf&uuml;gen — Klasseneinteilung{% endblock %}
+{% block title %}Elternwunsch bearbeiten — Klasseneinteilung{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>Elternwunsch hinzuf&uuml;gen</h2>
+    <h2>Elternwunsch bearbeiten</h2>
 </div>
 
 <div class="form-container">
-    <form method="POST" action="{{ url_for('add_wish') }}">
+    <form method="POST" action="{{ url_for('edit_wish', wish_id=wish.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="student_id">Sch&uuml;ler</label>
             <select id="student_id" name="student_id" class="form-control" required>
                 <option value="">Bitte w&auml;hlen</option>
                 {% for student in students %}
-                <option value="{{ student.id }}">{{ student.lastname }}, {{ student.firstname }}</option>
+                <option value="{{ student.id }}" {% if student.id == wish.student_id %}selected{% endif %}>{{ student.lastname }}, {{ student.firstname }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -24,31 +24,30 @@
             <label for="wish_type">Wunsch-Typ</label>
             <select id="wish_type" name="wish_type" class="form-control" required onchange="toggleRelatedStudent()">
                 <option value="">Bitte w&auml;hlen</option>
-                <option value="together">Zusammen mit anderem Sch&uuml;ler</option>
-                <option value="separated">Getrennt von anderem Sch&uuml;ler</option>
-                <option value="other">Sonstiger Wunsch</option>
+                <option value="together" {% if wish.wish_type == 'together' %}selected{% endif %}>Zusammen mit anderem Sch&uuml;ler</option>
+                <option value="separated" {% if wish.wish_type == 'separated' %}selected{% endif %}>Getrennt von anderem Sch&uuml;ler</option>
+                <option value="other" {% if wish.wish_type == 'other' %}selected{% endif %}>Sonstiger Wunsch</option>
             </select>
         </div>
 
-        <div class="form-group" id="related_student_group" style="display:none;">
+        <div class="form-group" id="related_student_group" style="display:{% if wish.wish_type in ['together', 'separated'] %}block{% else %}none{% endif %};">
             <label for="related_student_id">Bezugsperson (anderer Sch&uuml;ler)</label>
             <select id="related_student_id" name="related_student_id" class="form-control">
                 <option value="">Bitte w&auml;hlen</option>
                 {% for student in students %}
-                <option value="{{ student.id }}">{{ student.lastname }}, {{ student.firstname }}</option>
+                <option value="{{ student.id }}" {% if student.id == wish.related_student_id %}selected{% endif %}>{{ student.lastname }}, {{ student.firstname }}</option>
                 {% endfor %}
             </select>
         </div>
 
         <div class="form-group">
             <label for="description">Beschreibung</label>
-            <textarea id="description" name="description" class="form-control" rows="3"
-                      placeholder="Zus&auml;tzliche Informationen zum Wunsch"></textarea>
+            <textarea id="description" name="description" class="form-control" rows="3" placeholder="Zus&auml;tzliche Informationen zum Wunsch">{{ wish.description or '' }}</textarea>
         </div>
 
         <div class="form-actions">
             <a href="{{ url_for('wishes') }}" class="btn btn-secondary">Abbrechen</a>
-            <button type="submit" class="btn btn-primary">Wunsch hinzuf&uuml;gen</button>
+            <button type="submit" class="btn btn-primary">Speichern</button>
         </div>
     </form>
 </div>

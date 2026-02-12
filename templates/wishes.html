@@ -41,9 +41,13 @@
                 <td>{{ wish.related_student_name or '—' }}</td>
                 <td>{{ wish.description or '—' }}</td>
                 <td>
-                    <form method="POST" action="{{ url_for('delete_wish', wish_id=wish.id) }}" class="inline-form" onsubmit="return confirm('Wunsch wirklich l\u00f6schen?');">
-                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
-                    </form>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <a href="{{ url_for('edit_wish', wish_id=wish.id) }}" class="btn btn-secondary btn-sm">Bearbeiten</a>
+                        <form method="POST" action="{{ url_for('delete_wish', wish_id=wish.id) }}" class="inline-form" onsubmit="return confirm('Wunsch wirklich l\u00f6schen?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

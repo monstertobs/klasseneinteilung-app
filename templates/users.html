@@ -37,6 +37,7 @@
                 <td>
                     {% if user.id != session.user_id %}
                     <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Benutzer wirklich l\u00f6schen?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
                     </form>
                     {% else %}

@@ -9,6 +9,7 @@
 
 <div class="form-container">
     <form method="POST" action="{{ url_for('add_user') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="username">Benutzername</label>
             <input type="text" id="username" name="username" class="form-control" required
@@ -18,13 +19,18 @@
 
         <div class="form-group">
             <label for="password">Passwort</label>
-            <input type="password" id="password" name="password" class="form-control" required minlength="6">
-            <small class="form-text">Mindestens 6 Zeichen</small>
+            <input type="password" id="password" name="password" class="form-control" required minlength="8">
+            <small class="form-text">
+                <strong>Mindestens 8 Zeichen</strong> und muss enthalten:<br>
+                • Mindestens einen Großbuchstaben (A-Z)<br>
+                • Mindestens einen Kleinbuchstaben (a-z)<br>
+                • Mindestens eine Ziffer (0-9)
+            </small>
         </div>
 
         <div class="form-group">
             <label for="password_confirm">Passwort best&auml;tigen</label>
-            <input type="password" id="password_confirm" name="password_confirm" class="form-control" required minlength="6">
+            <input type="password" id="password_confirm" name="password_confirm" class="form-control" required minlength="8">
         </div>
 
         <div class="form-actions">

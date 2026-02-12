@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Seite nicht gefunden - Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center; padding: 60px 40px;">
+    <div style="font-size: 72px; margin-bottom: 20px;">🔍</div>
+    <h2>Seite nicht gefunden</h2>
+    <p style="color: var(--text-secondary); margin: 20px 0;">
+        Die angeforderte Seite existiert nicht.
+    </p>
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Zurück zum Dashboard</a>
+    </div>
+</div>
+{% endblock %}
