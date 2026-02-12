@@ -1,18 +1,17 @@
 @echo off
 chcp 65001 >nul
+setlocal enabledelayedexpansion
 color 0A
 mode con cols=80 lines=30
 cls
 
 echo.
-echo    ╔════════════════════════════════════════════════════════════════════╗
-echo    ║                                                                    ║
-echo    ║         KLASSENEINTEILUNG - PORTABLE INSTALLATION                 ║
-echo    ║         Für Windows 11 ohne Administrator-Rechte                  ║
-echo    ║                                                                    ║
-echo    ╚════════════════════════════════════════════════════════════════════╝
+echo    ================================================================
+echo    KLASSENEINTEILUNG - PORTABLE INSTALLATION
+echo    Fuer Windows 11 ohne Administrator-Rechte
+echo    ================================================================
 echo.
-echo    Diese Installation läuft komplett automatisch.
+echo    Diese Installation laeuft komplett automatisch.
 echo    Bitte warten Sie, bis der Vorgang abgeschlossen ist...
 echo.
 timeout /t 2 /nobreak >nul
@@ -23,24 +22,22 @@ set progress=0
 :progress_update
 cls
 echo.
-echo    ╔════════════════════════════════════════════════════════════════════╗
-echo    ║         KLASSENEINTEILUNG - PORTABLE INSTALLATION                 ║
-echo    ╚════════════════════════════════════════════════════════════════════╝
+echo    ================================================================
+echo    KLASSENEINTEILUNG - PORTABLE INSTALLATION
+echo    ================================================================
 echo.
 call :draw_progress %progress%
 echo.
 goto :progress_continue
 
 :draw_progress
-setlocal enabledelayedexpansion
 set /a bars=%1/2
 set /a spaces=50-%bars%
 set "bar_string="
 set "space_string="
-for /l %%i in (1,1,%bars%) do set "bar_string=!bar_string!█"
-for /l %%i in (1,1,%spaces%) do set "space_string=!space_string!░"
+for /l %%i in (1,1,%bars%) do set "bar_string=!bar_string!#"
+for /l %%i in (1,1,%spaces%) do set "space_string=!space_string!."
 echo    [!bar_string!!space_string!] %1%%
-endlocal
 exit /b
 
 :progress_continue
@@ -51,10 +48,10 @@ if %progress%==0 (
     timeout /t 1 /nobreak >nul
 )
 
-REM Prüfe ob portable Python schon existiert
+REM Pruefe ob portable Python schon existiert
 if %progress%==5 (
     if exist python-portable\python.exe (
-        echo    ✓ Portable Python bereits vorhanden
+        echo    Python bereits vorhanden
         set progress=25
         timeout /t 1 /nobreak >nul
         goto :install_packages_progress
@@ -79,21 +76,21 @@ if %progress%==15 (
         cls
         color 0C
         echo.
-        echo    ╔════════════════════════════════════════════════════════════════════╗
-        echo    ║                           FEHLER                                   ║
-        echo    ╚════════════════════════════════════════════════════════════════════╝
+        echo    ================================================================
+        echo    FEHLER
+        echo    ================================================================
         echo.
-        echo    ❌ Download fehlgeschlagen!
+        echo    Download fehlgeschlagen!
         echo.
-        echo    Mögliche Ursachen:
+        echo    Moegliche Ursachen:
         echo    - Keine Internet-Verbindung
         echo    - Firewall blockiert den Download
         echo.
         echo    ALTERNATIVE:
-        echo    1. Öffnen Sie: https://www.python.org/downloads/windows/
+        echo    1. Oeffnen Sie: https://www.python.org/downloads/windows/
         echo    2. Laden Sie "Windows embeddable package (64-bit)" herunter
         echo    3. Entpacken Sie die Datei in den Ordner "python-portable"
-        echo    4. Führen Sie dieses Script erneut aus
+        echo    4. Fuehren Sie dieses Script erneut aus
         echo.
         pause
         exit /b 1
@@ -171,7 +168,7 @@ if %progress%==80 (
 )
 
 if %progress%==90 (
-    echo    Erstelle Desktop-Verknüpfung...
+    echo    Erstelle Desktop-Verknuepfung...
     powershell -Command "$WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\Klasseneinteilung.lnk'); $Shortcut.TargetPath = '%CD%\PORTABLE-START.bat'; $Shortcut.WorkingDirectory = '%CD%'; $Shortcut.IconLocation = 'C:\Windows\System32\imageres.dll,3'; $Shortcut.Description = 'Klasseneinteilung App (Portable - Keine Installation erforderlich)'; $Shortcut.Save()" >nul 2>&1
     set progress=95
     timeout /t 1 /nobreak >nul
@@ -189,24 +186,22 @@ if %progress%==100 (
     cls
     color 0A
     echo.
-    echo    ╔════════════════════════════════════════════════════════════════════╗
-    echo    ║                                                                    ║
-    echo    ║                    ✅ INSTALLATION ERFOLGREICH!                    ║
-    echo    ║                                                                    ║
-    echo    ╚════════════════════════════════════════════════════════════════════╝
+    echo    ================================================================
+    echo    INSTALLATION ERFOLGREICH!
+    echo    ================================================================
     echo.
     call :draw_progress 100
     echo.
-    echo    ✓ Die Klasseneinteilung-App ist jetzt einsatzbereit!
-    echo    ✓ Desktop-Verknüpfung wurde erstellt
-    echo    ✓ Keine Installation erforderlich
-    echo    ✓ Kann auf USB-Stick kopiert werden
+    echo    Die Klasseneinteilung-App ist jetzt einsatzbereit!
+    echo    Desktop-Verknuepfung wurde erstellt
+    echo    Keine Installation erforderlich
+    echo    Kann auf USB-Stick kopiert werden
     echo.
-    echo    ───────────────────────────────────────────────────────────────────
+    echo    ----------------------------------------------------------------
     echo.
     echo    Die App wird automatisch in 5 Sekunden gestartet...
     echo.
-    echo    Oder drücken Sie eine beliebige Taste zum sofortigen Start.
+    echo    Oder druecken Sie eine beliebige Taste zum sofortigen Start.
     echo.
     timeout /t 5 >nul
 
