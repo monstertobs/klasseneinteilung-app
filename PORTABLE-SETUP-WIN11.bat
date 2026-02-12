@@ -32,14 +32,14 @@ echo.
 goto :progress_continue
 
 :draw_progress
-setlocal
+setlocal enabledelayedexpansion
 set /a bars=%1/2
 set /a spaces=50-%bars%
 set "bar_string="
 set "space_string="
 for /l %%i in (1,1,%bars%) do set "bar_string=!bar_string!█"
 for /l %%i in (1,1,%spaces%) do set "space_string=!space_string!░"
-echo    [%bar_string%%space_string%] %1%%
+echo    [!bar_string!!space_string!] %1%%
 endlocal
 exit /b
 
