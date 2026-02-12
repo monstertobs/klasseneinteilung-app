@@ -209,7 +209,7 @@ Environment variables from `.env` (see `.env.example`):
 
 ## Deployment Packages
 
-Two Windows deployment packages available (see `PAKETE-INFO.txt`):
+Three Windows deployment options available:
 
 **klasseneinteilung-app-WINDOWS.zip** - Standard installation with virtualenv
 - Requires Python 3.10+ installed
@@ -217,15 +217,32 @@ Two Windows deployment packages available (see `PAKETE-INFO.txt`):
 - Uses `START.bat` to launch
 - Creates desktop shortcut automatically
 
-**klasseneinteilung-app-PORTABLE.zip** - Portable version without admin rights
+**klasseneinteilung-app-PORTABLE.zip** - Basic portable version
 - No Python installation required
 - Downloads Python 3.11.8 Embedded automatically
 - Uses `PORTABLE-SETUP.bat` for one-time setup
 - Uses `PORTABLE-START.bat` to launch
 - Can run from USB stick
-- No system changes, fully portable
 
-Both packages include all security features and full documentation.
+**klasseneinteilung-app-PORTABLE-WIN11.zip** - Enhanced portable version (RECOMMENDED for Enterprise)
+- **Visual progress bar** during installation: [████████████░░░░] 80%
+- **Completely automatic** - no user input required
+- **No admin rights** needed - perfect for restricted Windows 11 Enterprise PCs
+- **Automatic browser launch** after installation
+- **Desktop shortcut** created automatically
+- Uses `PORTABLE-SETUP-WIN11.bat` for one-time setup with progress tracking
+- Uses `PORTABLE-START.bat` to launch
+- Includes comprehensive documentation:
+  * `START-HIER.txt` - Quick start guide (first file users see)
+  * `PORTABLE-ANLEITUNG-WIN11.txt` - Complete user manual
+  * `INSTALLATION-VORSCHAU.txt` - Shows what installation looks like
+  * `PORTABLE-WIN11-PAKET-INFO.txt` - Technical package details
+- Can run from USB stick or network drive
+- No system changes, fully portable
+- Installation time: 2-3 minutes (one-time), Future starts: 5 seconds
+- Downloads during setup: ~27 MB (Python + dependencies)
+
+All packages include all security features and full documentation.
 
 ## Language
 
@@ -249,3 +266,4 @@ Both `passenger_wsgi.py` and `.htaccess` contain placeholder paths that must be 
 - **Algorithm Priorities:** Gender balance is most important, followed by school route grouping, friend wishes, schulform distribution, and religion (secondary)
 - **Class Naming:** Classes are displayed as "5a, 5b, 5c..." for 5th grade (hardcoded)
 - **Wohnort Display:** Addresses are parsed to extract "PLZ Stadt" and grouped by city with counts
+- **Enterprise Deployment:** Use `klasseneinteilung-app-PORTABLE-WIN11.zip` for restricted Windows 11 environments - it's the most user-friendly option with visual progress tracking
