@@ -1,0 +1,66 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║             KLASSENEINTEILUNG - PORTABLE FÜR WINDOWS 11                  ║
+║                   Willkommen! Los geht's in 3 Schritten:                 ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+
+  🚀 SCHNELLSTART:
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │  SCHRITT 1: SETUP STARTEN                                             │
+  │  Doppelklick auf: PORTABLE-SETUP-WIN11.bat                            │
+  │  → Der Fortschrittsbalken zeigt den Installationsfortschritt          │
+  │  → Dauert ca. 2-3 Minuten (einmalig)                                  │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │  SCHRITT 2: AUTOMATISCHER START                                       │
+  │  → Die App startet automatisch nach dem Setup                         │
+  │  → Browser öffnet sich automatisch                                    │
+  │  → Login: admin / admin123                                            │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │  SCHRITT 3: FERTIG!                                                    │
+  │  → Desktop-Verknüpfung wurde erstellt                                 │
+  │  → Zukünftig einfach Doppelklick auf Verknüpfung                      │
+  │  → Oder: PORTABLE-START.bat benutzen                                  │
+  └────────────────────────────────────────────────────────────────────────┘
+
+
+  ✅ VORTEILE:
+  ───────────────────────────────────────────────────────────────────────────
+  • Keine Installation erforderlich
+  • Keine Administrator-Rechte nötig  
+  • Läuft direkt von USB-Stick oder Netzlaufwerk
+  • Funktioniert auf jedem Windows 11 Unternehmens-PC
+  • Hinterlässt keine Spuren im System
+
+
+  📖 AUSFÜHRLICHE ANLEITUNG:
+  ───────────────────────────────────────────────────────────────────────────
+  Siehe: PORTABLE-ANLEITUNG-WIN11.txt
+
+
+  ⚠️  WICHTIG - ERSTE SCHRITTE NACH DEM START:
+  ───────────────────────────────────────────────────────────────────────────
+  1. Ändern Sie sofort das Standard-Passwort "admin123"
+  2. Neues Passwort muss enthalten:
+     • Mindestens 8 Zeichen
+     • Großbuchstaben, Kleinbuchstaben, Ziffern
+
+
+  🔒 SICHERHEIT:
+  ───────────────────────────────────────────────────────────────────────────
+  ✓ CSRF-Schutz
+  ✓ Brute-Force-Schutz
+  ✓ Sichere Sessions
+  ✓ DSGVO-konform
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  Bei Fragen: Siehe PORTABLE-ANLEITUNG-WIN11.txt                          ║
+║  Viel Erfolg! 🎓                                                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝

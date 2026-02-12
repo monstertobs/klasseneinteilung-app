@@ -1,0 +1,141 @@
+═══════════════════════════════════════════════════════════════════════════
+  KLASSENEINTEILUNG - PORTABLE VERSION FÜR WINDOWS 11
+  Keine Installation • Keine Admin-Rechte • Komplett Portabel
+═══════════════════════════════════════════════════════════════════════════
+
+✅ VORTEILE DIESER VERSION:
+──────────────────────────────────────────────────────────────────────────
+  • Keine Installation erforderlich
+  • Funktioniert OHNE Administrator-Rechte
+  • Läuft direkt vom USB-Stick oder Netzlaufwerk
+  • Kann auf jeden Windows 11 PC kopiert werden
+  • Hinterlässt keine Spuren im System
+  • Alle Daten bleiben im App-Ordner
+
+
+📋 SCHNELLSTART (3 EINFACHE SCHRITTE):
+──────────────────────────────────────────────────────────────────────────
+
+  SCHRITT 1: ERSTMALIGE EINRICHTUNG
+    → Doppelklick auf: "PORTABLE-SETUP-WIN11.bat"
+    → Warten Sie, bis der Fortschrittsbalken bei 100% ist
+    → Die App wird automatisch gestartet
+
+  SCHRITT 2: BROWSER ÖFFNET SICH AUTOMATISCH
+    → Falls nicht, öffnen Sie: http://127.0.0.1:5050
+    → Login mit: admin / admin123
+    → ⚠️ WICHTIG: Ändern Sie das Passwort sofort!
+
+  SCHRITT 3: FERTIG!
+    → Die App ist nun einsatzbereit
+    → Desktop-Verknüpfung wurde erstellt
+
+
+🔄 TÄGLICHE NUTZUNG:
+──────────────────────────────────────────────────────────────────────────
+  Nach der erstmaligen Einrichtung:
+
+  • Doppelklick auf Desktop-Verknüpfung "Klasseneinteilung"
+    ODER
+  • Doppelklick auf "PORTABLE-START.bat" im App-Ordner
+
+  → Browser öffnet sich automatisch
+  → Zum Beenden: Fenster schließen
+
+
+⚙️ SYSTEMANFORDERUNGEN:
+──────────────────────────────────────────────────────────────────────────
+  • Windows 11 (funktioniert auch auf Windows 10)
+  • Internet-Verbindung (nur für erstmalige Einrichtung)
+  • Ca. 100 MB freier Speicherplatz
+  • Keine Administrator-Rechte erforderlich
+
+
+📁 ORDNERSTRUKTUR:
+──────────────────────────────────────────────────────────────────────────
+  klasseneinteilung-app-portable/
+  │
+  ├── PORTABLE-SETUP-WIN11.bat     ← Erstmalige Einrichtung
+  ├── PORTABLE-START.bat            ← Täglicher Start
+  ├── app.py                        ← Hauptanwendung
+  ├── templates/                    ← Webseiten-Vorlagen
+  ├── static/                       ← CSS & JavaScript
+  ├── klasseneinteilung.db          ← Datenbank (nach Start)
+  └── python-portable/              ← Portable Python (nach Setup)
+
+
+💾 DATEN SICHERN:
+──────────────────────────────────────────────────────────────────────────
+  Ihre Daten befinden sich in:
+  → klasseneinteilung.db
+
+  Zum Sichern:
+  1. Kopieren Sie die Datei "klasseneinteilung.db"
+  2. Speichern Sie sie an einem sicheren Ort
+
+  Zum Wiederherstellen:
+  1. Ersetzen Sie "klasseneinteilung.db" mit Ihrer Sicherung
+
+
+🔒 SICHERHEIT:
+──────────────────────────────────────────────────────────────────────────
+  ✓ CSRF-Schutz aktiviert
+  ✓ Brute-Force-Schutz (max. 10 Login-Versuche/Minute)
+  ✓ Sichere Session-Verwaltung
+  ✓ Passwort-Anforderungen erzwungen
+  ✓ DSGVO-konform
+
+  ⚠️ WICHTIG:
+  • Ändern Sie das Standard-Passwort "admin123" SOFORT
+  • Das neue Passwort muss enthalten:
+    - Mindestens 8 Zeichen
+    - Mindestens 1 Großbuchstaben
+    - Mindestens 1 Kleinbuchstaben
+    - Mindestens 1 Ziffer
+
+
+📱 USB-STICK NUTZUNG:
+──────────────────────────────────────────────────────────────────────────
+  1. Kopieren Sie den kompletten Ordner auf USB-Stick
+  2. Stecken Sie den USB-Stick in einen anderen PC
+  3. Doppelklick auf "PORTABLE-START.bat"
+  4. Fertig! Alle Daten sind dabei
+
+
+🆘 PROBLEMBEHEBUNG:
+──────────────────────────────────────────────────────────────────────────
+
+  PROBLEM: Setup-Download schlägt fehl
+  LÖSUNG:
+    • Überprüfen Sie Ihre Internet-Verbindung
+    • Falls Firewall aktiv: Erlauben Sie den Download
+    • Alternative: Manuelle Installation (siehe unten)
+
+  PROBLEM: Browser öffnet sich nicht automatisch
+  LÖSUNG:
+    • Öffnen Sie manuell: http://127.0.0.1:5050
+    • Oder: http://localhost:5050
+
+  PROBLEM: "Port bereits in Benutzung"
+  LÖSUNG:
+    • Eine andere Instanz läuft bereits
+    • Schließen Sie alle cmd.exe Fenster
+    • Starten Sie neu
+
+  PROBLEM: Fenster schließt sich sofort
+  LÖSUNG:
+    • Führen Sie "PORTABLE-SETUP-WIN11.bat" erneut aus
+    • Prüfen Sie, ob python-portable/ Ordner existiert
+
+
+📞 SUPPORT & WEITERE INFORMATIONEN:
+──────────────────────────────────────────────────────────────────────────
+  Dokumentation: Siehe CLAUDE.md
+  Sicherheit: Siehe SECURITY-UPDATES.md
+  GitHub: https://github.com/anthropics/claude-code/issues
+
+
+═══════════════════════════════════════════════════════════════════════════
+  Version: 2.1 Portable für Windows 11
+  Erstellt mit Claude Code • Keine Installation erforderlich
+═══════════════════════════════════════════════════════════════════════════

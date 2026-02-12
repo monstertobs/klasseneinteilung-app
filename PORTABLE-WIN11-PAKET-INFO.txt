@@ -1,0 +1,94 @@
+═══════════════════════════════════════════════════════════════════════════
+  PORTABLE WINDOWS 11 VERSION - PAKET-INFORMATION
+═══════════════════════════════════════════════════════════════════════════
+
+📦 DATEI:
+  klasseneinteilung-app-PORTABLE-WIN11.zip (58 KB)
+
+🎯 ZIELGRUPPE:
+  Windows 11 Unternehmens-PCs mit eingeschränkten Benutzerrechten
+
+✨ BESONDERHEITEN:
+  ✓ Visueller Fortschrittsbalken während Installation
+  ✓ Komplett automatische Einrichtung
+  ✓ Keine Benutzereingaben erforderlich
+  ✓ Automatischer Start nach Installation
+  ✓ Desktop-Verknüpfung wird automatisch erstellt
+
+🚀 INSTALLATION (FÜR ENDBENUTZER):
+  1. ZIP-Datei entpacken
+  2. Doppelklick auf "PORTABLE-SETUP-WIN11.bat"
+  3. Warten (Fortschrittsbalken zeigt Status)
+  4. FERTIG - App startet automatisch!
+
+⏱️  DAUER:
+  Erstmalige Installation: 2-3 Minuten
+  Downloads: ~27 MB (Python + Dependencies)
+  Zukünftige Starts: 5 Sekunden
+
+💼 ENTERPRISE-FEATURES:
+  ✓ Keine Administrator-Rechte erforderlich
+  ✓ Keine Installation ins System
+  ✓ Keine Registry-Einträge
+  ✓ Läuft von USB-Stick oder Netzlaufwerk
+  ✓ Komplett portabel
+
+🔒 SICHERHEIT:
+  ✓ CSRF-Schutz
+  ✓ Brute-Force-Schutz (10 Login-Versuche/Minute)
+  ✓ Sichere Sessions
+  ✓ Starke Passwort-Anforderungen
+  ✓ DSGVO-konform
+
+📋 ENTHALTENE DATEIEN:
+  • PORTABLE-SETUP-WIN11.bat      - Setup mit Fortschrittsbalken
+  • PORTABLE-START.bat             - Start-Script
+  • START-HIER.txt                 - Schnellstart-Anleitung
+  • PORTABLE-ANLEITUNG-WIN11.txt   - Vollständige Dokumentation
+  • app.py                         - Hauptanwendung
+  • templates/                     - HTML-Templates (16 Dateien)
+  • static/                        - CSS & JavaScript
+  • CLAUDE.md                      - Entwickler-Dokumentation
+  • SECURITY-UPDATES.md            - Sicherheits-Features
+
+🎨 BENUTZER-ERLEBNIS:
+  Während der Installation sieht der Benutzer:
+  
+  [████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░] 50%
+  [SCHRITT 3/4] Installiere Paket-Manager (pip)...
+  
+  Klare Fortschrittsanzeige von 0% bis 100%
+  Farbige Darstellung (grün bei Erfolg)
+  Step-by-Step Status-Meldungen
+
+✅ GETESTET FÜR:
+  • Windows 11 Professional
+  • Windows 11 Enterprise
+  • Eingeschränkte Benutzerkonten
+  • Netzlaufwerke
+  • USB-Sticks
+
+🔄 PORTABILITÄT:
+  • Kompletter Ordner kann kopiert werden
+  • Funktioniert auf jedem Windows 11 PC
+  • Alle Daten bleiben im App-Ordner
+  • Datenbank (klasseneinteilung.db) ist portabel
+
+📧 VERTEILUNG:
+  Die ZIP-Datei kann:
+  • Per E-Mail verschickt werden (nur 58 KB!)
+  • Auf Netzlaufwerk bereitgestellt werden
+  • Auf USB-Sticks kopiert werden
+  • In Intranet-Portal hochgeladen werden
+
+💡 WICHTIGE HINWEISE:
+  • Benutzer braucht nur ZIP zu entpacken und Setup zu starten
+  • Alles andere läuft automatisch
+  • Internet-Verbindung während Setup erforderlich
+  • Standard-Login: admin / admin123 (MUSS geändert werden!)
+
+═══════════════════════════════════════════════════════════════════════════
+  Erstellt: 12. Februar 2026
+  Version: 2.1 Portable für Windows 11
+  Mit Claude Code entwickelt
+═══════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,120 @@
+═══════════════════════════════════════════════════════════════════════════
+  SO SIEHT DIE INSTALLATION AUS - VORSCHAU
+═══════════════════════════════════════════════════════════════════════════
+
+
+SCHRITT 1: SETUP STARTEN
+──────────────────────────────────────────────────────────────────────────
+Benutzer macht Doppelklick auf: PORTABLE-SETUP-WIN11.bat
+
+
+SCHRITT 2: WILLKOMMENS-BILDSCHIRM (2 Sekunden)
+──────────────────────────────────────────────────────────────────────────
+
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║                                                                    ║
+    ║         KLASSENEINTEILUNG - PORTABLE INSTALLATION                 ║
+    ║         Für Windows 11 ohne Administrator-Rechte                  ║
+    ║                                                                    ║
+    ╚════════════════════════════════════════════════════════════════════╝
+
+    Diese Installation läuft komplett automatisch.
+    Bitte warten Sie, bis der Vorgang abgeschlossen ist...
+
+
+SCHRITT 3: FORTSCHRITTSANZEIGE (automatisch)
+──────────────────────────────────────────────────────────────────────────
+
+Bei 15%:
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║         KLASSENEINTEILUNG - PORTABLE INSTALLATION                 ║
+    ╚════════════════════════════════════════════════════════════════════╝
+
+    [███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 15%
+
+    [SCHRITT 2/4] Lade Python herunter (20 MB)...
+    Dies kann 30-60 Sekunden dauern...
+
+
+Bei 50%:
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║         KLASSENEINTEILUNG - PORTABLE INSTALLATION                 ║
+    ╚════════════════════════════════════════════════════════════════════╝
+
+    [█████████████████████████░░░░░░░░░░░░░░░░░░░░░░░] 50%
+
+    [SCHRITT 3/4] Installiere Paket-Manager (pip)...
+
+
+Bei 80%:
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║         KLASSENEINTEILUNG - PORTABLE INSTALLATION                 ║
+    ╚════════════════════════════════════════════════════════════════════╝
+
+    [████████████████████████████████████████░░░░░░░░░] 80%
+
+    [SCHRITT 4/4] Installiere Zusatz-Module...
+
+
+SCHRITT 4: ERFOLG-BILDSCHIRM (mit automatischem Start in 5 Sek.)
+──────────────────────────────────────────────────────────────────────────
+
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║                                                                    ║
+    ║                    ✅ INSTALLATION ERFOLGREICH!                    ║
+    ║                                                                    ║
+    ╚════════════════════════════════════════════════════════════════════╝
+
+    [██████████████████████████████████████████████████] 100%
+
+    ✓ Die Klasseneinteilung-App ist jetzt einsatzbereit!
+    ✓ Desktop-Verknüpfung wurde erstellt
+    ✓ Keine Installation erforderlich
+    ✓ Kann auf USB-Stick kopiert werden
+
+    ───────────────────────────────────────────────────────────────────
+
+    Die App wird automatisch in 5 Sekunden gestartet...
+
+    Oder drücken Sie eine beliebige Taste zum sofortigen Start.
+
+
+SCHRITT 5: APP STARTET AUTOMATISCH
+──────────────────────────────────────────────────────────────────────────
+
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║                                                                    ║
+    ║              ✅ APP LÄUFT - BROWSER WIRD GEÖFFNET                  ║
+    ║                                                                    ║
+    ║    URL: http://127.0.0.1:5050                                     ║
+    ║    Login: admin / admin123                                        ║
+    ║                                                                    ║
+    ║    WICHTIG: Ändern Sie das Passwort nach dem ersten Login!       ║
+    ║                                                                    ║
+    ╚════════════════════════════════════════════════════════════════════╝
+
+    Zum Beenden der App dieses Fenster schließen oder Strg+C drücken.
+
+
+═══════════════════════════════════════════════════════════════════════════
+  ZEITAUFWAND:
+  • Erstmalige Installation: 2-3 Minuten (einmalig)
+  • Zukünftige Starts: 5 Sekunden
+═══════════════════════════════════════════════════════════════════════════
+
+
+HINWEISE FÜR DEN BENUTZER:
+──────────────────────────────────────────────────────────────────────────
+✓ Der Benutzer muss NICHTS eingeben
+✓ Der Benutzer muss NICHTS installieren
+✓ Der Benutzer muss KEINE Einstellungen vornehmen
+✓ Alles läuft vollautomatisch
+
+✓ Fortschrittsbalken zeigt immer den aktuellen Status
+✓ Klare Meldungen bei jedem Schritt
+✓ Automatischer Start nach Installation
+✓ Desktop-Verknüpfung wird automatisch erstellt
+
+✓ Funktioniert auf Windows 11 Unternehmens-PCs ohne Admin-Rechte
+✓ Kann auf USB-Stick kopiert und auf anderen PCs genutzt werden
+✓ Hinterlässt keine Spuren im System

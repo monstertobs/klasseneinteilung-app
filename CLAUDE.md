@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A **security-hardened**, DSGVO-compliant Flask web application for generating school class divisions (5th grade). Considers parent wishes, gender balance, religion, special needs (inclusive education), and athletic ability to produce optimized class assignments. Designed for deployment on All-Inkl shared hosting with local SQLite storage.
+A **security-hardened**, DSGVO-compliant Flask web application for generating school class divisions (5th grade). Considers parent wishes, gender balance, school routes (wohnort), school type classification (schulform), religion, special needs (inclusive education), and athletic ability to produce optimized class assignments. Designed for deployment on All-Inkl shared hosting with local SQLite storage.
 
 **Security Features (v2.0):**
 - ✅ CSRF Protection (Flask-WTF)
@@ -36,10 +36,10 @@ There is no test suite, linter, or build step configured.
 
 ## Architecture
 
-Single-file Flask app (`app.py`, ~1100 lines):
+Single-file Flask app (`app.py`, ~1330 lines):
 
-- **app.py** — All routes (18 endpoints), database schema, class division algorithm, auth logic, security features
-- **templates/** — 17 Jinja2 templates extending `base.html` (includes error pages)
+- **app.py** — All routes (18 endpoints), database schema, class division algorithm, auth logic, security features, Excel/CSV import processing
+- **templates/** — 16 Jinja2 templates extending `base.html` (includes error pages)
 - **static/css/style.css** — Apple-inspired responsive design with CSS custom properties
 - **static/js/script.js** — Alert auto-dismiss and delete confirmations
 - **passenger_wsgi.py** — WSGI entry point for All-Inkl production hosting
@@ -52,11 +52,11 @@ Single-file Flask app (`app.py`, ~1100 lines):
 - `/logout` - Session termination
 
 **Student management:**
-- `/students` - List all students
-- `/students/add` - Add new student (GET/POST)
-- `/students/edit/<id>` - Edit student (GET/POST)
+- `/students` - List all students with wohnort and schulform columns
+- `/students/add` - Add new student (GET/POST) with wohnort and schulform fields
+- `/students/edit/<id>` - Edit student (GET/POST) with wohnort and schulform fields
 - `/students/delete/<id>` - Delete student (POST, CSRF protected)
-- `/students/import` - Import from CSV/Excel (GET/POST)
+- `/students/import` - Import from CSV/Excel (GET/POST) with extensive column mapping
 - `/students/duplicates` - Review and manage duplicate students
 
 **Parent wishes management:**
@@ -66,7 +66,7 @@ Single-file Flask app (`app.py`, ~1100 lines):
 - `/wishes/delete/<id>` - Delete wish (POST, CSRF protected)
 
 **Class division:**
-- `/generate` - Generate class proposals (GET/POST)
+- `/generate` - Generate class proposals (GET/POST) - displays classes as "5a, 5b, 5c..."
 - `/assignments` - View saved assignments
 
 **User management:**
@@ -85,36 +85,75 @@ Single-file Flask app (`app.py`, ~1100 lines):
 
 Four tables: `users`, `students`, `parent_wishes`, `class_assignments`. All queries use parameterized SQL (no ORM). The `class_assignments.data` column stores JSON.
 
-**Student fields:** `firstname`, `lastname`, `gender` (m/w/d), `religion` (ethik/katholisch/evangelisch/leer), `sportlich` (0/1), `special_needs` (hoerschaedigung/sprache/sozial_emotional/lernen/leer), `notes`, `import_batch_id` (UUID for tracking imports).
+**Student fields:**
+- Core: `firstname`, `lastname`, `gender` (m/w/d), `created_by`, `created_at`
+- School route: `wohnort` (address/location for carpooling groups)
+- School type: `schulform` (H=Hauptschule, R=Realschule, G=Gymnasium, IB=Inklusive Beschulung)
+- Additional: `religion` (ethik/katholisch/evangelisch/leer), `sportlich` (0/1), `special_needs` (hoerschaedigung/sprache/sozial_emotional/lernen/leer), `notes`
+- Import tracking: `import_batch_id` (UUID for tracking imports)
 
 Schema migrations use `ALTER TABLE ... ADD COLUMN` wrapped in try/except for existing columns. `init_db()` runs on every startup.
 
 ### Class Division Algorithm
 
-Two functions: `generate_class_assignment()` and `find_best_class()`. Creates N classes (~25 students each), generates 3 proposals with different random seeds.
+**Core Functions:** `generate_class_assignment(students, wishes, num_classes, seed, options)` and `find_best_class(student, classes, gender_count, wohnort_count, schulform_count, religion_count, inklusion_count, wish_dict, num_classes, options)`.
 
-Scoring weights in `find_best_class()`:
+Creates N classes (~25 students each), generates 3 proposals with different random seeds.
+
+**Algorithm Priorities (from highest to lowest):**
+1. **Geschlechterbalance (SEHR WICHTIG):** -15 per gender ratio concentration
+2. **Schulweg-Gruppierung (WICHTIG):** +12 bonus for students from same location (enables carpooling)
+3. **Freundewünsche (WICHTIG):** +20 together / -20 separated
+4. **Schulform-Verteilung (WICHTIG):** -8 per schulform ratio concentration
+5. **Religion (ZWEITRANGIG):** -2 per religion ratio (reduced priority)
+
+**Additional scoring weights:**
 - **Size balance:** -10 per size difference from average (always active)
-- **Gender balance:** -5 per gender ratio (toggleable)
-- **Parent wishes:** +20 together / -20 separated (toggleable)
-- **Religion distribute:** -5 per religion ratio concentration (toggleable)
-- **Religion group:** +5 for same religion in class (toggleable, mutually exclusive with distribute)
 - **Sportklasse:** +50 for athletic students in class 1, -30 penalty otherwise (toggleable)
 - **Inklusion limit:** -1000 if class exceeds max special needs count (configurable number)
 
-Options are passed as a dict from the generate route (GET=defaults, POST=form values).
+Options are passed as a dict from the generate route (GET=defaults, POST=form values):
+- `gender_balance` (default: True)
+- `schulweg_gruppe` (default: True) - groups students by wohnort
+- `parent_wishes` (default: True)
+- `schulform_balance` (default: True) - distributes H/R/G/IB evenly
+- `religion_distribute` / `religion_group` (mutually exclusive)
+- `sportklasse`, `max_inklusion`
+
+**Result formatting:**
+- Classes are displayed as "5a, 5b, 5c..." instead of "Klasse 1, 2, 3..."
+- Wohnorte are simplified to "PLZ Stadt (count)" format (e.g., "61440 Oberursel (3)")
+- City counts aggregate multiple addresses from same city
 
 ### Import Functionality
 
-CSV/Excel import with flexible column mapping recognizes various column names:
+CSV/Excel import with extensive column mapping in `process_import_data(data, batch_id)`:
+
+**Specific column recognition for school data:**
+- **Vorname/Nachname:** Standard name fields
+- **Geschlecht:** m/w/d (männlich/weiblich/divers)
+- **SLR_WohnAdresse:** Full address → wohnort field
+- **Eignung:** H/R/G values → schulform field
+- **IB / VM - s.Liste:** IB sets schulform='IB', VM stored in notes
+- **Religion / Wahlfach Religion:** Wahlfach takes precedence
+- **Sportklasse:** Ja/X/1 → sportlich=1
+- **Freund/ Freundin:** Automatically creates 'together' wishes (attempts name matching)
+- **Auf keine Fall mit Kind…:** Automatically creates 'separated' wishes
+- **Infos Übergabe / Sonstige / Einwände:** Combined into notes field
+
+**Generic column mapping (flexible recognition):**
 - Firstname: `vorname`, `firstname`, `first_name`, `first name`, `name`
 - Lastname: `nachname`, `lastname`, `last_name`, `last name`, `familienname`
 - Gender: `geschlecht`, `gender`, `sex` (accepts `m/w/d`, `männlich/weiblich/divers`, `male/female`)
-- Religion: `religion`, `konfession`
-- Sportlich: `sportlich`, `sport`, `athletic` (accepts `ja/yes/1/true/x`)
+- Wohnort: `wohnort`, `ort`, `adresse`, `address`, `schulweg`, `location`, `slr_wonadresse`
+- Schulform: `schulform`, `schule`, `school_type`, `bildungsgang`, `eignung`
+- Religion: `religion`, `konfession`, `wahlfach religion`
+- Sportlich: `sportlich`, `sport`, `athletic`, `sportklasse` (accepts `ja/yes/1/true/x`)
 - Special needs: `förderbedarf`, `foerderbedarf`, `special_needs`, `sonderpädagogik`
 
-Imports create a batch ID for tracking and duplicate detection based on firstname+lastname.
+**Import returns:** `(imported_count, errors, duplicates, wishes_created)`
+
+Imports create a batch ID for tracking and duplicate detection based on firstname+lastname. Friend wishes use intelligent name matching (tries both "Vorname Nachname" and "Nachname Vorname" combinations).
 
 ### Authentication & Security
 
@@ -150,6 +189,12 @@ Templates use Jinja2 syntax with German UI text. Form submissions use POST with 
     <!-- form fields -->
 </form>
 ```
+
+**Key templates:**
+- `generate.html` - Displays classes as "5a, 5b, 5c..." with schulform stats and simplified wohnort display
+- `students.html` - Includes wohnort and schulform columns
+- `add_student.html` / `edit_student.html` - Include wohnort input and schulform dropdown
+- `import_students.html` - Excel/CSV upload interface
 
 ## Configuration
 
@@ -201,3 +246,6 @@ Both `passenger_wsgi.py` and `.htaccess` contain placeholder paths that must be 
 - **Default Password:** `admin123` does NOT meet new security requirements - must be changed immediately
 - **Security Updates:** See `SECURITY-UPDATES.md` for detailed documentation of v2.0 security improvements
 - **DSGVO Compliance:** App is designed for German schools following HDSG and HSchG § 83
+- **Algorithm Priorities:** Gender balance is most important, followed by school route grouping, friend wishes, schulform distribution, and religion (secondary)
+- **Class Naming:** Classes are displayed as "5a, 5b, 5c..." for 5th grade (hardcoded)
+- **Wohnort Display:** Addresses are parsed to extract "PLZ Stadt" and grouped by city with counts
