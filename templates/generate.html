@@ -53,7 +53,7 @@
             </label>
 
             <label style="display: flex; align-items: center; gap: 0.5rem;">
-                Max. Inklusionskinder pro Klasse:
+                Max. Schüler mit Förderbedarf pro Klasse:
                 <input type="number" name="max_inklusion" min="0" max="20" value="{{ options.max_inklusion }}" style="width: 4rem;" class="form-control">
                 <span style="color: #6c757d; font-size: 0.875rem;">(0 = kein Limit)</span>
             </label>
@@ -129,16 +129,25 @@
                     <span class="gender-stat" title="Ethik">E {{ class.religion_count.ethik }}</span>
                     <span class="gender-stat" title="Katholisch">K {{ class.religion_count.katholisch }}</span>
                     <span class="gender-stat" title="Evangelisch">Ev {{ class.religion_count.evangelisch }}</span>
-                    <span class="gender-stat" title="Inklusionskinder">Inkl {{ class.inklusion_count }}</span>
+                    <span class="gender-stat" title="Sch&uuml;ler mit F&ouml;rderbedarf">Förderb. {{ class.inklusion_count }}</span>
                     <span class="gender-stat" title="Sportliche Sch&uuml;ler">Sport {{ class.sport_count }}</span>
                 </div>
 
                 {% if class.city_count and class.city_count|length > 0 %}
-                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #6c757d;">
-                    <strong>Wohnorte:</strong>
-                    {% for city, count in class.city_count.items()|sort %}
-                        {{ city }}{% if count > 1 %} ({{ count }}){% endif %}{% if not loop.last %}, {% endif %}
-                    {% endfor %}
+                <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #e9ecef;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        📍 Wohnorte ({{ class.city_count|length }} Städte)
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                        {% for city, count in class.city_count.items()|sort %}
+                        <span style="display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);">
+                            {{ city }}
+                            {% if count > 1 %}
+                            <span style="margin-left: 0.3rem; padding: 0.1rem 0.4rem; background: rgba(255, 255, 255, 0.3); border-radius: 8px; font-size: 0.7rem; font-weight: 600;">{{ count }}</span>
+                            {% endif %}
+                        </span>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% endif %}
 
