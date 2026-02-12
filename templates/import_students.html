@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Sch&uuml;ler importieren — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Sch&uuml;ler importieren</h2>
+</div>
+
+<div class="form-container">
+    <div style="background: #e3f2fd; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+        <h3 style="margin-top: 0;">📋 Anleitung</h3>
+        <p><strong>Unterst&uuml;tzte Formate:</strong></p>
+        <ul>
+            <li>CSV-Dateien (.csv) - mit Semikolon (;) oder Komma (,) getrennt</li>
+            {% if excel_support %}
+            <li>Excel-Dateien (.xlsx)</li>
+            {% else %}
+            <li style="color: #999;">Excel-Dateien (.xlsx) - <em>Nicht installiert. Bitte installieren Sie openpyxl.</em></li>
+            {% endif %}
+        </ul>
+
+        <p><strong>Erforderliche Spalten:</strong></p>
+        <ul>
+            <li><strong>Vorname</strong> (oder: firstname, first_name) - Pflichtfeld</li>
+            <li><strong>Nachname</strong> (oder: lastname, last_name) - Pflichtfeld</li>
+        </ul>
+
+        <p><strong>Optionale Spalten:</strong></p>
+        <ul>
+            <li><strong>Geschlecht</strong> (oder: gender) - Werte: m/w/d, männlich/weiblich/divers</li>
+            <li><strong>Religion</strong> (oder: konfession) - Werte: ethik, katholisch, evangelisch</li>
+            <li><strong>Sportlich</strong> (oder: sport) - Werte: ja/nein, 1/0, x/-</li>
+            <li><strong>F&ouml;rderbedarf</strong> (oder: special_needs) - Werte: hoerschaedigung, sprache, sozial_emotional, lernen</li>
+            <li><strong>Notizen</strong> (oder: notes, bemerkungen)</li>
+        </ul>
+
+        <p><strong>Beispiel CSV:</strong></p>
+        <pre style="background: white; padding: 1rem; border-radius: 4px; overflow-x: auto;">Vorname;Nachname;Geschlecht;Religion;Sportlich;Förderbedarf;Notizen
+Max;Mustermann;m;katholisch;ja;;Guter Schüler
+Anna;Schmidt;w;evangelisch;nein;sprache;Sprachförderung
+Leon;Müller;m;ethik;ja;;Sehr sportlich</pre>
+
+        <p style="margin-bottom: 0;"><strong>💡 Tipp:</strong> Die Import-Funktion erkennt verschiedene Spaltennamen automatisch.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('import_students') }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="file">Datei ausw&auml;hlen</label>
+            <input type="file" id="file" name="file" class="form-control" accept=".csv,.xlsx,.xls" required>
+            <small style="color: #666; margin-top: 0.5rem; display: block;">
+                Unterst&uuml;tzte Formate: CSV (.csv){% if excel_support %}, Excel (.xlsx){% endif %}
+            </small>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('students') }}" class="btn btn-secondary">Abbrechen</a>
+            <button type="submit" class="btn btn-primary">Importieren</button>
+        </div>
+    </form>
+</div>
+
+<style>
+.form-control[type="file"] {
+    padding: 0.75rem;
+    cursor: pointer;
+}
+
+.form-control[type="file"]::file-selector-button {
+    padding: 0.5rem 1rem;
+    margin-right: 1rem;
+    border: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.form-control[type="file"]::file-selector-button:hover {
+    opacity: 0.9;
+}
+
+pre {
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+</style>
+{% endblock %}

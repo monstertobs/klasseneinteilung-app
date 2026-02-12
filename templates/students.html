@@ -8,7 +8,10 @@
         <h2>Sch&uuml;ler verwalten</h2>
         <p>{{ students|length }} Sch&uuml;ler insgesamt</p>
     </div>
-    <a href="{{ url_for('add_student') }}" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</a>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{{ url_for('import_students') }}" class="btn btn-secondary">Importieren</a>
+        <a href="{{ url_for('add_student') }}" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</a>
+    </div>
 </div>
 
 {% if students %}
@@ -20,6 +23,8 @@
                 <th>Nachname</th>
                 <th>Vorname</th>
                 <th>Geschlecht</th>
+                <th>Wohnort</th>
+                <th>Schulform</th>
                 <th>Religion</th>
                 <th>Sportlich</th>
                 <th>F&ouml;rderbedarf</th>
@@ -29,9 +34,14 @@
         </thead>
         <tbody>
             {% for student in students %}
-            <tr>
+            <tr {% if student.import_batch_id %}class="imported-student"{% endif %}>
                 <td>{{ loop.index }}</td>
-                <td><strong>{{ student.lastname }}</strong></td>
+                <td>
+                    <strong>{{ student.lastname }}</strong>
+                    {% if student.import_batch_id %}
+                    <span class="badge-imported" title="Importiert am {{ student.created_at[:16] if student.created_at else '' }}">Importiert</span>
+                    {% endif %}
+                </td>
                 <td>{{ student.firstname }}</td>
                 <td>
                     {% if student.gender == 'm' %}
@@ -40,6 +50,20 @@
                         Weiblich
                     {% else %}
                         Divers
+                    {% endif %}
+                </td>
+                <td>{{ student.wohnort or '—' }}</td>
+                <td>
+                    {% if student.schulform == 'H' %}
+                        Hauptschule
+                    {% elif student.schulform == 'R' %}
+                        Realschule
+                    {% elif student.schulform == 'G' %}
+                        Gymnasium
+                    {% elif student.schulform == 'IB' %}
+                        Inkl. Beschulung
+                    {% else %}
+                        —
                     {% endif %}
                 </td>
                 <td>
@@ -71,9 +95,13 @@
                 </td>
                 <td>{{ student.notes or '—' }}</td>
                 <td>
-                    <form method="POST" action="{{ url_for('delete_student', student_id=student.id) }}" class="inline-form" onsubmit="return confirm('Sch\u00fcler wirklich l\u00f6schen?');">
-                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
-                    </form>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <a href="{{ url_for('edit_student', student_id=student.id) }}" class="btn btn-secondary btn-sm">Bearbeiten</a>
+                        <form method="POST" action="{{ url_for('delete_student', student_id=student.id) }}" class="inline-form" onsubmit="return confirm('Sch\u00fcler wirklich l\u00f6schen?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -87,4 +115,27 @@
     <a href="{{ url_for('add_student') }}" class="btn btn-primary">Ersten Sch&uuml;ler hinzuf&uuml;gen</a>
 </div>
 {% endif %}
+
+<style>
+.imported-student {
+    background-color: #e3f2fd !important;
+}
+
+.imported-student:hover {
+    background-color: #bbdefb !important;
+}
+
+.badge-imported {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+</style>
 {% endblock %}

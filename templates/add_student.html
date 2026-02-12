@@ -9,6 +9,7 @@
 
 <div class="form-container">
     <form method="POST" action="{{ url_for('add_student') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-row">
             <div class="form-group">
                 <label for="firstname">Vorname</label>
@@ -28,6 +29,24 @@
                 <option value="m">M&auml;nnlich</option>
                 <option value="w">Weiblich</option>
                 <option value="d">Divers</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="wohnort">Wohnort / Schulweg</label>
+            <input type="text" id="wohnort" name="wohnort" class="form-control"
+                   placeholder="z.B. Stadtteil, Stra&szlig;e oder Busroute">
+            <small class="form-text">Hilft bei der Bildung von Fahrgemeinschaften</small>
+        </div>
+
+        <div class="form-group">
+            <label for="schulform">Schulform</label>
+            <select id="schulform" name="schulform" class="form-control">
+                <option value="">Bitte w&auml;hlen</option>
+                <option value="H">Hauptschule (H)</option>
+                <option value="R">Realschule (R)</option>
+                <option value="G">Gymnasium (G)</option>
+                <option value="IB">Inklusive Beschulung (IB)</option>
             </select>
         </div>
 

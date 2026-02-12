@@ -13,15 +13,26 @@
 <div class="options-panel" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
     <h4 style="margin-top: 0;">Einteilungsoptionen</h4>
     <form method="POST" action="{{ url_for('generate') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                 <input type="checkbox" name="gender_balance" value="1" {% if options.gender_balance %}checked{% endif %}>
-                Geschlechterverteilung ber&uuml;cksichtigen
+                <strong>Geschlechterverteilung</strong> ber&uuml;cksichtigen
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="schulweg_gruppe" value="1" {% if options.get('schulweg_gruppe', True) %}checked{% endif %}>
+                <strong>Schulweg/Wohnort</strong> gruppieren
             </label>
 
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                 <input type="checkbox" name="parent_wishes" value="1" {% if options.parent_wishes %}checked{% endif %}>
                 Elternw&uuml;nsche ber&uuml;cksichtigen
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="schulform_balance" value="1" {% if options.get('schulform_balance', True) %}checked{% endif %}>
+                Schulformen verteilen
             </label>
 
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
@@ -87,7 +98,7 @@
             {% for class in proposal.classes %}
             <div class="class-card">
                 <div class="class-header">
-                    <h4>Klasse {{ class.number }}{% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}</h4>
+                    <h4>Klasse 5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}{% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}</h4>
                     <span class="class-count">{{ class.count }} Sch&uuml;ler</span>
                 </div>
 
@@ -97,6 +108,23 @@
                     <span class="gender-stat">D {{ class.gender_count.d }}</span>
                 </div>
 
+                {% if class.schulform_count and (class.schulform_count.H + class.schulform_count.R + class.schulform_count.G + class.schulform_count.IB) > 0 %}
+                <div class="gender-distribution" style="margin-top: 0.25rem;">
+                    {% if class.schulform_count.H > 0 %}
+                    <span class="gender-stat" title="Hauptschule">H {{ class.schulform_count.H }}</span>
+                    {% endif %}
+                    {% if class.schulform_count.R > 0 %}
+                    <span class="gender-stat" title="Realschule">R {{ class.schulform_count.R }}</span>
+                    {% endif %}
+                    {% if class.schulform_count.G > 0 %}
+                    <span class="gender-stat" title="Gymnasium">G {{ class.schulform_count.G }}</span>
+                    {% endif %}
+                    {% if class.schulform_count.IB > 0 %}
+                    <span class="gender-stat" title="Inklusive Beschulung">IB {{ class.schulform_count.IB }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <div class="gender-distribution" style="margin-top: 0.25rem;">
                     <span class="gender-stat" title="Ethik">E {{ class.religion_count.ethik }}</span>
                     <span class="gender-stat" title="Katholisch">K {{ class.religion_count.katholisch }}</span>
@@ -104,6 +132,15 @@
                     <span class="gender-stat" title="Inklusionskinder">Inkl {{ class.inklusion_count }}</span>
                     <span class="gender-stat" title="Sportliche Sch&uuml;ler">Sport {{ class.sport_count }}</span>
                 </div>
+
+                {% if class.city_count and class.city_count|length > 0 %}
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #6c757d;">
+                    <strong>Wohnorte:</strong>
+                    {% for city, count in class.city_count.items()|sort %}
+                        {{ city }}{% if count > 1 %} ({{ count }}){% endif %}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
 
                 <div class="student-list">
                     {% for student in class.students %}
@@ -139,8 +176,10 @@
     <h4>Hinweise zur Einteilung</h4>
     <ul>
         <li>Die drei Vorschl&auml;ge ber&uuml;cksichtigen die oben gew&auml;hlten Optionen</li>
-        <li>F&ouml;rderbedarf: <strong>H</strong> = H&ouml;rsch&auml;digung, <strong>S</strong> = Sprache, <strong>SE</strong> = Sozial/Emotional, <strong>L</strong> = Lernen</li>
-        <li>E = Ethik, K = Katholisch, Ev = Evangelisch</li>
+        <li><strong>Priorit&auml;ten:</strong> Geschlecht > Schulweg/Wohnort > Freundew&uuml;nsche > Schulform > Religion</li>
+        <li><strong>Schulformen:</strong> H = Hauptschule, R = Realschule, G = Gymnasium, IB = Inklusive Beschulung</li>
+        <li><strong>F&ouml;rderbedarf:</strong> H = H&ouml;rsch&auml;digung, S = Sprache, SE = Sozial/Emotional, L = Lernen</li>
+        <li><strong>Religion:</strong> E = Ethik, K = Katholisch, Ev = Evangelisch</li>
         <li>&Auml;ndern Sie die Optionen und klicken Sie &bdquo;Neu generieren&ldquo; f&uuml;r andere Ergebnisse</li>
     </ul>
 </div>
