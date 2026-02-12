@@ -1,4 +1,39 @@
-*.db
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+venv/
+env/
+
+# Database
+*.db
+*.db-journal
+
+# Environment & Config
 .env
+
+# Excel & CSV (may contain real student data!)
+*.xlsx
+*.xls
+*.csv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Test files
+TEST-*.txt
+test_*.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
