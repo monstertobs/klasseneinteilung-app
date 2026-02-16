@@ -16,14 +16,18 @@ if not exist python-portable\python.exe (
     exit /b 1
 )
 
-REM Pruefe ob .env existiert
+REM Pruefe ob .env existiert, wenn nicht -> automatisch erstellen
 if not exist .env (
-    echo FEHLER: .env Datei nicht gefunden!
+    echo .env Datei nicht gefunden - erstelle automatisch...
     echo.
-    echo Bitte fuehren Sie "PORTABLE-SETUP-WIN11.bat" aus.
+    python-portable\python.exe -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" > .env
+    echo FLASK_DEBUG=False >> .env
+    echo DATABASE_PATH=klasseneinteilung.db >> .env
+    echo SESSION_LIFETIME=2 >> .env
+    echo MAX_USERS=10 >> .env
+    echo MAX_STUDENTS=250 >> .env
+    echo .env Datei erfolgreich erstellt!
     echo.
-    pause
-    exit /b 1
 )
 
 REM Pruefe ob Datenbank initialisiert werden muss
