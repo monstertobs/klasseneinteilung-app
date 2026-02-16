@@ -21,7 +21,9 @@ A **security-hardened**, DSGVO-compliant Flask web application for generating sc
 # Install dependencies (Python 3.10+ recommended for Werkzeug scrypt support)
 pip3 install -r requirements.txt
 
-# Run development server (http://localhost:5050, login: admin/admin123)
+# Run development server (http://localhost:5050)
+# WICHTIG: Initial admin password wird beim ersten Start in der Konsole angezeigt
+# Password ist zufällig generiert (16 Zeichen) - SOFORT notieren!
 python3 app.py
 
 # Initialize/reset database (also runs automatically on startup)
