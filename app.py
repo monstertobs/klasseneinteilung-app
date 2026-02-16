@@ -56,6 +56,13 @@ try:
 except ImportError:
     EXCEL_SUPPORT = False
 
+# Lade .env Datei (für SECRET_KEY und andere Konfiguration)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # Lädt .env aus dem aktuellen Verzeichnis
+except ImportError:
+    pass  # python-dotenv nicht installiert (Production mit System-Variablen)
+
 app = Flask(__name__)
 
 # SECRET_KEY muss als Umgebungsvariable gesetzt sein (Sicherheit!)
