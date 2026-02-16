@@ -1,15 +1,52 @@
+"""
+Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
+
+Version: 2.0.0
+Author: Tobias Meier <admin(at)secutobs.com>
+Date: February 13, 2026
+License: Proprietary - All rights reserved
+
+Description:
+    Webanwendung zur automatisierten Erstellung von Klasseneinteilungen
+    mit Berücksichtigung von Geschlechterverteilung, Schulweg, Elternwünschen,
+    Schulformen, Religion, Spezialklassen und Inklusion.
+
+Features:
+    - Intelligenter Einteilungs-Algorithmus
+    - Export (Excel, CSV, PDF)
+    - Mehrere Spezialklassen (Sport, Musik, Theater)
+    - Religion-Bündelung
+    - IB Min/Max-Einschränkungen
+    - Drag & Drop Vorschau-Modus
+    - Konflikt-Erkennung und -Auflösung
+    - DSGVO-konform
+    - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
+"""
+
+__version__ = '2.0.0'
+__author__ = 'Tobias Meier'
+__email__ = 'admin(at)secutobs.com'
+
+# Konstanten
+MAX_CLASS_SIZE = 25  # Maximale Anzahl Schüler pro Klasse
+__copyright__ = 'Copyright © 2026 Tobias Meier'
+__license__ = 'Proprietary'
+
 import os
 import sqlite3
 import random
 import csv
 import io
 import re
+import secrets
+import string
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_session import Session
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
@@ -20,7 +57,26 @@ except ImportError:
     EXCEL_SUPPORT = False
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# SECRET_KEY muss als Umgebungsvariable gesetzt sein (Sicherheit!)
+app.secret_key = os.environ.get('SECRET_KEY')
+if not app.secret_key:
+    raise RuntimeError(
+        "KRITISCHER FEHLER: SECRET_KEY Umgebungsvariable nicht gesetzt!\n"
+        "Generieren Sie einen sicheren Key mit:\n"
+        "  python3 -c 'import secrets; print(secrets.token_hex(32))'\n"
+        "Dann setzen Sie ihn in der .env Datei:\n"
+        "  SECRET_KEY=<generierter-key>"
+    )
+
+# Session-Konfiguration für Filesystem-basierte Sessions (größere Daten möglich)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = os.path.join(os.path.dirname(__file__), 'flask_session')
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+
+# JSON und Encoding-Konfiguration
+app.config['JSON_AS_ASCII'] = False  # Erlaubt Unicode in JSON (keine ASCII-Escape-Sequenzen)
 
 # Sicherheits-Konfiguration
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
@@ -33,6 +89,9 @@ app.config['WTF_CSRF_SSL_STRICT'] = False  # Für Entwicklung
 # CSRF-Schutz aktivieren
 csrf = CSRFProtect(app)
 
+# Session initialisieren
+Session(app)
+
 # Rate Limiting aktivieren (verhindert Brute-Force-Angriffe)
 limiter = Limiter(
     app=app,
@@ -41,12 +100,22 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+# Response-Header für UTF-8 Encoding setzen
+@app.after_request
+def after_request(response):
+    """Setzt UTF-8 Encoding für alle Responses"""
+    if response.content_type and 'text/html' in response.content_type:
+        response.content_type = 'text/html; charset=utf-8'
+    return response
+
 DATABASE = 'klasseneinteilung.db'
 
 def get_db():
     """Datenbankverbindung herstellen"""
     db = sqlite3.connect(DATABASE)
     db.row_factory = sqlite3.Row
+    # UTF-8 Encoding für Text-Daten erzwingen
+    db.text_factory = str
     return db
 
 def init_db():
@@ -90,7 +159,10 @@ def init_db():
         ('sportlich', 'INTEGER DEFAULT 0'),
         ('import_batch_id', 'TEXT'),
         ('wohnort', 'TEXT DEFAULT ""'),
-        ('schulform', 'TEXT DEFAULT ""')
+        ('schulform', 'TEXT DEFAULT ""'),
+        ('sport_interesse', 'INTEGER DEFAULT 0'),
+        ('musik_interesse', 'INTEGER DEFAULT 0'),
+        ('theater_interesse', 'INTEGER DEFAULT 0')
     ]:
         try:
             cursor.execute(f'ALTER TABLE students ADD COLUMN {col} {coldef}')
@@ -126,9 +198,30 @@ def init_db():
     # Standard-Admin-User erstellen (falls nicht vorhanden)
     cursor.execute('SELECT * FROM users WHERE username = ?', ('admin',))
     if not cursor.fetchone():
-        password_hash = generate_password_hash('admin123')
-        cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', 
-                      ('admin', password_hash))
+        try:
+            # Generiere ein sicheres zufälliges Passwort (16 Zeichen)
+            alphabet = string.ascii_letters + string.digits + string.punctuation
+            initial_password = ''.join(secrets.choice(alphabet) for _ in range(16))
+
+            # Hash das Passwort mit pbkdf2 für Kompatibilität
+            password_hash = generate_password_hash(initial_password, method='pbkdf2:sha256')
+            cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
+                          ('admin', password_hash))
+
+            # WICHTIG: Passwort nur EINMAL anzeigen (wird nicht gespeichert!)
+            print("\n" + "="*70)
+            print("WICHTIG: Neuer Admin-Account erstellt!")
+            print("="*70)
+            print(f"  Benutzername: admin")
+            print(f"  Passwort:     {initial_password}")
+            print("="*70)
+            print("BITTE SOFORT NACH DEM ERSTEN LOGIN ÄNDERN!")
+            print("Das Passwort wird nicht erneut angezeigt und ist nicht wiederherstellbar.")
+            print("="*70 + "\n")
+        except Exception as e:
+            # Skip admin user creation if error (user should already exist in DB)
+            print(f"Warning: Could not create admin user: {e}")
+            pass
     
     db.commit()
     db.close()
@@ -175,6 +268,28 @@ def index():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
+
+@app.route('/version')
+def version():
+    """Version und Autor-Informationen anzeigen"""
+    return jsonify({
+        'version': __version__,
+        'author': __author__,
+        'email': __email__,
+        'copyright': __copyright__,
+        'license': __license__,
+        'release_date': 'February 13, 2026'
+    })
+
+@app.route('/about')
+def about():
+    """Über die Anwendung und Kontaktdaten"""
+    return render_template('about.html')
+
+@app.route('/algorithm')
+def algorithm():
+    """Algorithmus-Dokumentation - Wie funktioniert die Klasseneinteilung?"""
+    return render_template('algorithm.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")  # Brute-Force-Schutz: Max 10 Login-Versuche pro Minute
@@ -243,7 +358,9 @@ def dashboard():
                          wish_count=wish_count,
                          assignment_count=assignment_count,
                          wizard_active=wizard_active,
-                         wizard_step=wizard_step)
+                         wizard_step=wizard_step,
+                         version=__version__,
+                         author=__author__)
 
 @app.route('/students')
 @login_required
@@ -269,6 +386,7 @@ def add_student():
         schulform = request.form.get('schulform', '')
         religion = request.form.get('religion', '')
         sportlich = 1 if 'sportlich' in request.form else 0
+        sport_interesse = 1 if 'sport_interesse' in request.form else 0
         special_needs = request.form.get('special_needs', '').strip()
         notes = request.form.get('notes', '').strip()
 
@@ -276,9 +394,11 @@ def add_student():
             db = get_db()
             cursor = db.cursor()
             cursor.execute('''
-                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, special_needs, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich, special_needs, notes, session['user_id']))
+                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
+                                     sport_interesse, musik_interesse, theater_interesse, special_needs, notes, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
+                  sport_interesse, 0, 0, special_needs, notes, session['user_id']))
             db.commit()
             db.close()
 
@@ -304,6 +424,7 @@ def edit_student(student_id):
         schulform = request.form.get('schulform', '')
         religion = request.form.get('religion', '')
         sportlich = 1 if 'sportlich' in request.form else 0
+        sport_interesse = 1 if 'sport_interesse' in request.form else 0
         special_needs = request.form.get('special_needs', '').strip()
         notes = request.form.get('notes', '').strip()
 
@@ -311,9 +432,11 @@ def edit_student(student_id):
             cursor.execute('''
                 UPDATE students
                 SET firstname = ?, lastname = ?, gender = ?, wohnort = ?, schulform = ?, religion = ?,
-                    sportlich = ?, special_needs = ?, notes = ?
+                    sportlich = ?, sport_interesse = ?, musik_interesse = ?, theater_interesse = ?,
+                    special_needs = ?, notes = ?
                 WHERE id = ?
-            ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich, special_needs, notes, student_id))
+            ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
+                  sport_interesse, 0, 0, special_needs, notes, student_id))
             db.commit()
             db.close()
 
@@ -763,6 +886,62 @@ def delete_student(student_id):
     flash('Schüler wurde gelöscht.', 'success')
     return redirect(url_for('students'))
 
+@app.route('/students/delete_multiple', methods=['POST'])
+@login_required
+def delete_multiple_students():
+    """Mehrere ausgewählte Schüler löschen"""
+    student_ids = request.form.getlist('student_ids')
+
+    if not student_ids:
+        flash('Keine Schüler ausgewählt.', 'warning')
+        return redirect(url_for('students'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    count = 0
+    for student_id in student_ids:
+        # Zuerst verbundene Elternwünsche löschen
+        cursor.execute('DELETE FROM parent_wishes WHERE student_id = ? OR related_student_id = ?',
+                      (student_id, student_id))
+
+        # Dann den Schüler löschen
+        cursor.execute('DELETE FROM students WHERE id = ?', (student_id,))
+        count += 1
+
+    db.commit()
+    db.close()
+
+    flash(f'{count} Schüler wurden gelöscht.', 'success')
+    return redirect(url_for('students'))
+
+@app.route('/students/delete_all', methods=['POST'])
+@login_required
+def delete_all_students():
+    """Alle Schüler löschen"""
+    db = get_db()
+    cursor = db.cursor()
+
+    # Zähle Schüler vor dem Löschen
+    cursor.execute('SELECT COUNT(*) FROM students')
+    count = cursor.fetchone()[0]
+
+    if count == 0:
+        flash('Keine Schüler vorhanden.', 'info')
+        return redirect(url_for('students'))
+
+    # Zuerst alle Elternwünsche löschen
+    cursor.execute('DELETE FROM parent_wishes')
+
+    # Dann alle Schüler löschen
+    cursor.execute('DELETE FROM students')
+
+    db.commit()
+    db.close()
+
+    flash(f'Alle {count} Schüler wurden gelöscht.', 'success')
+    return redirect(url_for('students'))
+
 @app.route('/wishes')
 @login_required
 def wishes():
@@ -890,21 +1069,56 @@ def generate():
         flash('Keine Schüler vorhanden. Bitte fügen Sie zuerst Schüler hinzu.', 'warning')
         return redirect(url_for('students'))
 
+    # Anzahl der Klassen berechnen (max. 25 Schüler pro Klasse)
+    num_classes = max(1, (len(students) + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
+
+    # Validierung: Warnung wenn Klassen sehr voll werden
+    avg_class_size = len(students) / num_classes
+    if avg_class_size > MAX_CLASS_SIZE - 2:  # Warnung ab 23+ Schüler pro Klasse
+        flash(f'ℹ️ {num_classes} Klassen erstellt für {len(students)} Schüler (Ø {avg_class_size:.1f} pro Klasse, max. {MAX_CLASS_SIZE})', 'info')
+
     # Optionen aus POST oder Standardwerte
     if request.method == 'POST':
-        max_inklusion = request.form.get('max_inklusion', '0')
-        try:
-            max_inklusion = int(max_inklusion)
-        except ValueError:
-            max_inklusion = 0
+        # IB Min/Max
+        ib_min = int(request.form.get('ib_min', '0'))
+        ib_max = int(request.form.get('ib_max', '0'))
+
+        # Validierung: min <= max
+        if ib_min > ib_max and ib_max > 0:
+            flash('IB-Minimum darf nicht größer als Maximum sein.', 'danger')
+            ib_min = 0
+            ib_max = 0
+
+        # Spezialklassen
+        specialized_classes = {}
+        specialized_classes['sport'] = int(request.form.get('specialized_sport_count', '0'))
+
+        # Freie Spezialklasse
+        custom_count = int(request.form.get('specialized_custom_count', '0'))
+        custom_name = request.form.get('specialized_custom_name', '').strip()
+        if custom_count > 0 and custom_name:
+            specialized_classes['custom'] = custom_count
+            specialized_classes['custom_name'] = custom_name
+        else:
+            specialized_classes['custom'] = 0
+            specialized_classes['custom_name'] = ''
+
+        # Pre-Generation Check: Genug IB-Schüler?
+        if ib_max > 0:
+            ib_students = [s for s in students if s['schulform'] == 'IB']
+            if len(ib_students) > num_classes * ib_max:
+                flash(f'⚠️ Zu viele IB-Schüler ({len(ib_students)}) für {num_classes} Klassen mit max {ib_max} pro Klasse', 'warning')
 
         options = {
             'gender_balance': 'gender_balance' in request.form,
             'parent_wishes': 'parent_wishes' in request.form,
             'religion_distribute': 'religion_distribute' in request.form,
             'religion_group': 'religion_group' in request.form,
-            'max_inklusion': max_inklusion,
+            'religion_bundle': 'religion_bundle' in request.form,
             'sportklasse': 'sportklasse' in request.form,
+            'specialized_classes': specialized_classes,
+            'ib_min': ib_min,
+            'ib_max': ib_max,
         }
     else:
         options = {
@@ -912,12 +1126,12 @@ def generate():
             'parent_wishes': True,
             'religion_distribute': True,
             'religion_group': False,
-            'max_inklusion': 0,
+            'religion_bundle': False,
             'sportklasse': False,
+            'specialized_classes': {'sport': 0, 'custom': 0, 'custom_name': ''},
+            'ib_min': 2,
+            'ib_max': 5,
         }
-
-    # Anzahl der Klassen berechnen (ca. 25 Schüler pro Klasse)
-    num_classes = max(1, (len(students) + 24) // 25)
 
     # 3 verschiedene Einteilungen generieren
     proposals = []
@@ -925,7 +1139,34 @@ def generate():
         proposal = generate_class_assignment(students, wishes, num_classes, i, options)
         proposals.append(proposal)
 
+    # Proposals in Session speichern für Export
+    session['last_proposals'] = proposals
+
     return render_template('generate.html', proposals=proposals, num_classes=num_classes, options=options)
+
+def extract_city_from_wohnort(wohnort):
+    """Extrahiere Stadt (PLZ + Stadtname) aus vollständiger Adresse"""
+    import re
+    if not wohnort or not wohnort.strip():
+        return None
+    match = re.search(r'(\d{5})\s+([^,]+)', wohnort)
+    if match:
+        plz = match.group(1)
+        stadt = match.group(2).strip()
+        # Entferne Klammern wie "(Taunus)"
+        stadt = re.sub(r'\s*\([^)]*\)', '', stadt).strip()
+        return f"{plz} {stadt}"
+    return None
+
+def extract_plz_from_wohnort(wohnort):
+    """Extrahiere nur die PLZ aus vollständiger Adresse"""
+    import re
+    if not wohnort or not wohnort.strip():
+        return None
+    match = re.search(r'(\d{5})', wohnort)
+    if match:
+        return match.group(1)
+    return None
 
 def generate_class_assignment(students, wishes, num_classes, seed, options):
     """Intelligente Klasseneinteilung generieren"""
@@ -935,7 +1176,33 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
     student_list = [dict(s) for s in students]
     random.shuffle(student_list)
 
-    # Bei Sportklasse: sportliche Schüler zuerst verteilen
+    # Spezialklassen: Mapping von Klassen-Indizes zu Spezialtypen
+    specialized_mapping = {}
+    specialized_classes = options.get('specialized_classes', {})
+    class_idx = 0
+
+    # Sport-Klassen zuerst
+    sport_count = specialized_classes.get('sport', 0)
+    for i in range(sport_count):
+        if class_idx < num_classes:
+            specialized_mapping[class_idx] = 'sport'
+            class_idx += 1
+
+    # Custom-Klassen danach
+    custom_count = specialized_classes.get('custom', 0)
+    custom_name = specialized_classes.get('custom_name', '')
+    for i in range(custom_count):
+        if class_idx < num_classes:
+            specialized_mapping[class_idx] = 'custom'
+            class_idx += 1
+
+    # Bei Sportklassen: Schüler mit Sport-Interesse zuerst sortieren
+    if sport_count > 0:
+        interested = [s for s in student_list if s.get('sport_interesse')]
+        not_interested = [s for s in student_list if not s.get('sport_interesse')]
+        student_list = interested + not_interested
+
+    # Bei Sportklasse: sportliche Schüler zuerst verteilen (backward compatibility)
     if options.get('sportklasse', False):
         sportliche = [s for s in student_list if s.get('sportlich')]
         andere = [s for s in student_list if not s.get('sportlich')]
@@ -945,10 +1212,16 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
     classes = [[] for _ in range(num_classes)]
 
     # Geschlechterzähler pro Klasse
-    gender_count = [{'m': 0, 'w': 0, 'd': 0} for _ in range(num_classes)]
+    gender_count = [{'m': 0, 'w': 0} for _ in range(num_classes)]
 
     # Wohnort-Zähler pro Klasse (für Schulweg-Gruppierung)
     wohnort_count = [{} for _ in range(num_classes)]
+
+    # Städte-Zähler pro Klasse (für Städte-basierte Gruppierung)
+    city_count = [{} for _ in range(num_classes)]
+
+    # PLZ-Zähler pro Klasse (für PLZ-basierte Gruppierung)
+    plz_count = [{} for _ in range(num_classes)]
 
     # Schulform-Zähler pro Klasse
     schulform_count = [{'H': 0, 'R': 0, 'G': 0, 'IB': 0, '': 0} for _ in range(num_classes)]
@@ -958,6 +1231,9 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
 
     # Inklusionszähler pro Klasse
     inklusion_count = [0 for _ in range(num_classes)]
+
+    # IB-Zähler pro Klasse
+    ib_count = [0 for _ in range(num_classes)]
 
     # Wünsche als Dictionary organisieren
     wish_dict = {}
@@ -969,11 +1245,11 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
 
     # Schüler auf Klassen verteilen
     for student in student_list:
-        best_class = find_best_class(student, classes, gender_count, wohnort_count, schulform_count, religion_count, inklusion_count, wish_dict, num_classes, options)
+        best_class = find_best_class(student, classes, gender_count, wohnort_count, city_count, plz_count, schulform_count, religion_count, inklusion_count, ib_count, wish_dict, num_classes, options, specialized_mapping)
         classes[best_class].append(student)
 
         # Geschlechterzähler aktualisieren
-        gender = student.get('gender', 'd')
+        gender = student.get('gender', 'm')
         if gender in gender_count[best_class]:
             gender_count[best_class][gender] += 1
 
@@ -984,6 +1260,22 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
                 wohnort_count[best_class][wohnort] += 1
             else:
                 wohnort_count[best_class][wohnort] = 1
+
+            # Städte-Zähler aktualisieren (PLZ + Stadt)
+            city = extract_city_from_wohnort(wohnort)
+            if city:
+                if city in city_count[best_class]:
+                    city_count[best_class][city] += 1
+                else:
+                    city_count[best_class][city] = 1
+
+            # PLZ-Zähler aktualisieren (nur PLZ)
+            plz = extract_plz_from_wohnort(wohnort)
+            if plz:
+                if plz in plz_count[best_class]:
+                    plz_count[best_class][plz] += 1
+                else:
+                    plz_count[best_class][plz] = 1
 
         # Schulform-Zähler aktualisieren
         schulform = student.get('schulform', '').strip()
@@ -999,6 +1291,10 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
         # Inklusionszähler aktualisieren
         if student.get('special_needs', ''):
             inklusion_count[best_class] += 1
+
+        # IB-Zähler aktualisieren
+        if student.get('schulform') == 'IB':
+            ib_count[best_class] += 1
 
     # Ergebnis formatieren
     result = {
@@ -1030,6 +1326,11 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
                 else:
                     city_count[city_key] = count
 
+        # Bestimme Spezialklassen-Typ
+        special_type = specialized_mapping.get(i, None)
+        is_sportklasse = options.get('sportklasse', False) and i == 0  # Backward compatibility
+        custom_name = options.get('specialized_classes', {}).get('custom_name', '') if special_type == 'custom' else ''
+
         result['classes'].append({
             'number': i + 1,
             'students': cls,
@@ -1040,26 +1341,54 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
             'schulform_count': schulform_count[i],
             'religion_count': religion_count[i],
             'inklusion_count': inklusion_count[i],
+            'ib_count': ib_count[i],
             'sport_count': sport_count,
-            'is_sportklasse': options.get('sportklasse', False) and i == 0
+            'is_sportklasse': is_sportklasse,
+            'special_type': special_type,
+            'custom_name': custom_name
         })
 
     return result
 
-def find_best_class(student, classes, gender_count, wohnort_count, schulform_count, religion_count, inklusion_count, wish_dict, num_classes, options):
+def find_best_class(student, classes, gender_count, wohnort_count, city_count, plz_count, schulform_count, religion_count, inklusion_count, ib_count, wish_dict, num_classes, options, specialized_mapping=None):
     """Beste Klasse für einen Schüler finden"""
     scores = []
-    max_inklusion = options.get('max_inklusion', 0)
+    ib_min = options.get('ib_min', 0)
+    ib_max = options.get('ib_max', 0)
+    is_ib_student = student.get('schulform') == 'IB'
+    if specialized_mapping is None:
+        specialized_mapping = {}
 
     for i, cls in enumerate(classes):
         score = 0
+
+        # HARTE GRENZE: Maximale Klassengröße (25 Schüler)
+        if len(cls) >= MAX_CLASS_SIZE:
+            score -= 10000  # Extrem harte Blockade - Klasse ist voll
+            scores.append(score)
+            continue
 
         # Größenausgleich (bevorzuge kleinere Klassen)
         avg_size = sum(len(c) for c in classes) / num_classes
         size_diff = len(cls) - avg_size
         score -= size_diff * 10
 
-        # Sportklasse: Klasse 1 (Index 0) für sportliche Schüler
+        # Spezialklassen: Interesse-basiertes Scoring
+        if i in specialized_mapping:
+            special_type = specialized_mapping[i]
+            # Nur für Sport-Klassen (Custom hat kein Interesse-Feld)
+            if special_type == 'sport':
+                if student.get('sport_interesse'):
+                    score += 50  # Starker Bonus für passendes Interesse
+                else:
+                    score -= 20  # Strafe wenn Schüler kein Interesse hat
+
+        # Wenn Schüler Sport-Interesse hat aber nicht in Sport-Spezialklasse
+        if student.get('sport_interesse'):
+            if specialized_mapping.get(i) != 'sport':
+                score -= 10  # Leichte Strafe
+
+        # Sportklasse (backward compatibility): Klasse 1 (Index 0) für sportliche Schüler
         if options.get('sportklasse', False):
             if student.get('sportlich'):
                 if i == 0:
@@ -1070,27 +1399,42 @@ def find_best_class(student, classes, gender_count, wohnort_count, schulform_cou
                 if i == 0:
                     score -= 30  # Nicht-sportliche weg von Klasse 1
 
-        # Inklusion: Limit pro Klasse
-        if max_inklusion > 0 and student.get('special_needs', ''):
-            if inklusion_count[i] >= max_inklusion:
-                score -= 1000  # Klasse ist voll → stark vermeiden
+        # IB Min/Max Einschränkungen
+        if ib_min > 0 and ib_max > 0 and is_ib_student:
+            current_ib = ib_count[i]
+            if current_ib == 0:
+                pass  # OK um neue IB-Klasse zu starten
+            elif current_ib < ib_min:
+                score += 30  # Starker Push um Minimum zu erreichen
+            elif ib_min <= current_ib < ib_max:
+                score += 10  # Weiter auffüllen
+            elif current_ib >= ib_max:
+                score -= 1000  # Harte Blockade - Maximum erreicht
 
         # Geschlechterbalance (SEHR WICHTIG - höchste Priorität)
         if options.get('gender_balance', True):
-            gender = student.get('gender', 'd')
+            gender = student.get('gender', 'm')
             if gender in gender_count[i]:
                 total = sum(gender_count[i].values())
                 if total > 0:
                     gender_ratio = gender_count[i][gender] / total
                     score -= gender_ratio * 15  # Erhöht von 5 auf 15 für höhere Priorität
 
-        # Schulweg-Gruppierung (wichtig für Fahrgemeinschaften)
+        # Schulweg-Gruppierung (WICHTIG - Schüler aus gleicher Stadt/PLZ zusammen)
         if options.get('schulweg_gruppe', True):
             wohnort = student.get('wohnort', '').strip()
             if wohnort:
-                if wohnort in wohnort_count[i]:
-                    # Bonus für gleichen Wohnort (Fahrgemeinschaften möglich)
-                    score += wohnort_count[i][wohnort] * 12
+                # Stadt-Gruppierung (PLZ + Stadtname)
+                city = extract_city_from_wohnort(wohnort)
+                if city and city in city_count[i]:
+                    # HOHER Bonus für gleiche Stadt (Fahrgemeinschaften, soziale Verbindungen)
+                    score += city_count[i][city] * 20
+
+                # PLZ-Gruppierung (zusätzlicher Bonus wenn gleiche PLZ aber andere Stadt)
+                plz = extract_plz_from_wohnort(wohnort)
+                if plz and plz in plz_count[i]:
+                    # Mittlerer Bonus für gleiche PLZ (regionale Nähe)
+                    score += plz_count[i][plz] * 10
 
         # Schulform-Verteilung
         if options.get('schulform_balance', True):
@@ -1116,6 +1460,19 @@ def find_best_class(student, classes, gender_count, wohnort_count, schulform_cou
             if religion and religion in religion_count[i]:
                 if religion_count[i][religion] > 0:
                     score += 2  # Reduziert von 5 auf 2
+
+        # Religion-Bündelung (Ethik mit Konfessionen)
+        if options.get('religion_bundle', False):
+            religion = student.get('religion', '') or ''
+            if religion == 'ethik':
+                konfession_count = religion_count[i].get('katholisch', 0) + religion_count[i].get('evangelisch', 0)
+                if konfession_count > 0:
+                    score += 15  # Bonus für Vielfalt
+                else:
+                    score -= 20  # Strafe für Isolation (reine Ethik-Klasse vermeiden)
+            elif religion in ['katholisch', 'evangelisch']:
+                if religion_count[i].get('ethik', 0) > 0:
+                    score += 8  # Bonus wenn Ethik vorhanden
 
         # Elternwünsche berücksichtigen (WICHTIG)
         if options.get('parent_wishes', True):
@@ -1210,15 +1567,507 @@ def assignments():
     db = get_db()
     cursor = db.cursor()
     cursor.execute('''
-        SELECT ca.*, u.username 
+        SELECT ca.*, u.username
         FROM class_assignments ca
         LEFT JOIN users u ON ca.created_by = u.id
         ORDER BY ca.created_at DESC
     ''')
     assignments = cursor.fetchall()
     db.close()
-    
+
     return render_template('assignments.html', assignments=assignments)
+
+@app.route('/assignments/<int:assignment_id>')
+@login_required
+def view_assignment(assignment_id):
+    """Einzelne gespeicherte Einteilung anzeigen"""
+    import json
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('''
+        SELECT ca.*, u.username
+        FROM class_assignments ca
+        LEFT JOIN users u ON ca.created_by = u.id
+        WHERE ca.id = ?
+    ''', (assignment_id,))
+    assignment = cursor.fetchone()
+    db.close()
+
+    if not assignment:
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+
+    # Daten aus JSON parsen
+    proposal = json.loads(assignment['data'])
+
+    # Als einzelnes Proposal anzeigen (wie in generate.html, aber nur eines)
+    return render_template('view_assignment.html',
+                         assignment=assignment,
+                         proposal=proposal,
+                         num_classes=len(proposal['classes']))
+
+@app.route('/save_assignment', methods=['POST'])
+@login_required
+def save_assignment():
+    """Ausgewählte Einteilung speichern"""
+    import json
+
+    proposal_index = int(request.form.get('proposal_index', 0))
+    proposals = session.get('last_proposals', [])
+
+    if not proposals or proposal_index >= len(proposals):
+        flash('Keine gültige Einteilung gefunden. Bitte generieren Sie zuerst eine Einteilung.', 'danger')
+        return redirect(url_for('generate'))
+
+    proposal = proposals[proposal_index]
+
+    # Automatischen Namen generieren
+    now = datetime.now()
+    assignment_name = f"Einteilung vom {now.strftime('%d.%m.%Y %H:%M')}"
+
+    # In Datenbank speichern
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('''
+        INSERT INTO class_assignments (name, data, created_by, created_at)
+        VALUES (?, ?, ?, ?)
+    ''', (assignment_name, json.dumps(proposal), session['user_id'], now.strftime('%Y-%m-%d %H:%M:%S')))
+    db.commit()
+    db.close()
+
+    num_classes = len(proposal['classes'])
+    num_students = len([s for c in proposal['classes'] for s in c['students']])
+    flash(f'Einteilung "{assignment_name}" erfolgreich gespeichert! ({num_classes} Klassen, {num_students} Schüler)', 'success')
+    return redirect(url_for('assignments'))
+
+@app.route('/assignments/<int:assignment_id>/export/<format_type>', methods=['POST'])
+@login_required
+def export_saved_assignment(assignment_id, format_type):
+    """Exportiert eine gespeicherte Einteilung"""
+    import json
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT data FROM class_assignments WHERE id = ?', (assignment_id,))
+    assignment = cursor.fetchone()
+    db.close()
+
+    if not assignment:
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+
+    proposal = json.loads(assignment['data'])
+
+    if format_type == 'excel':
+        return generate_excel_export(proposal)
+    elif format_type == 'csv':
+        return generate_csv_export(proposal)
+    elif format_type == 'pdf':
+        return generate_pdf_export(proposal)
+    else:
+        flash('Ungültiges Export-Format.', 'danger')
+        return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
+@app.route('/export/<format_type>', methods=['POST'])
+@login_required
+def export_classes(format_type):
+    """Export Klasseneinteilung in verschiedenen Formaten"""
+    from flask import make_response, send_file
+
+    try:
+        # Hole die Proposals aus der Session
+        proposals = session.get('last_proposals', [])
+        proposal_index = int(request.form.get('proposal_index', 0))
+
+        if not proposals or proposal_index >= len(proposals):
+            flash('Keine gültige Einteilung gefunden. Bitte generieren Sie zuerst eine Einteilung.', 'danger')
+            return redirect(url_for('generate'))
+
+        proposal = proposals[proposal_index]
+
+        if format_type == 'excel':
+            return generate_excel_export(proposal)
+        elif format_type == 'csv':
+            return generate_csv_export(proposal)
+        elif format_type == 'pdf':
+            return generate_pdf_export(proposal)
+        else:
+            flash('Ungültiges Export-Format.', 'danger')
+            return redirect(url_for('generate'))
+    except Exception as e:
+        flash(f'Fehler beim Export: {str(e)}', 'danger')
+        return redirect(url_for('generate'))
+
+def generate_excel_export(proposal):
+    """Generiert Excel-Export"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from io import BytesIO
+    from flask import send_file
+
+    wb = Workbook()
+    wb.remove(wb.active)  # Entferne leeres Sheet
+
+    # Erstelle ein Sheet pro Klasse
+    for class_data in proposal['classes']:
+        class_name = f"5{chr(96 + class_data['number'])}"
+        ws = wb.create_sheet(title=class_name)
+
+        # Header
+        ws['A1'] = f"Klasse {class_name}"
+        ws['A1'].font = Font(size=14, bold=True)
+        ws.merge_cells('A1:D1')
+
+        # Statistiken
+        ws['A3'] = 'Statistiken:'
+        ws['A3'].font = Font(bold=True)
+        ws['A4'] = f"Gesamt: {class_data['count']} Schüler"
+        ws['A5'] = f"Männlich: {class_data['gender_count']['m']}"
+        ws['A6'] = f"Weiblich: {class_data['gender_count']['w']}"
+
+        if class_data.get('schulform_count'):
+            row = 8
+            ws[f'A{row}'] = 'Schulformen:'
+            ws[f'A{row}'].font = Font(bold=True)
+            row += 1
+            for sf, count in class_data['schulform_count'].items():
+                if count > 0 and sf:
+                    ws[f'A{row}'] = f"{sf}: {count}"
+                    row += 1
+
+        # Schülerliste Header
+        start_row = 14
+        ws[f'A{start_row}'] = 'Nachname'
+        ws[f'B{start_row}'] = 'Vorname'
+        ws[f'C{start_row}'] = 'Geschlecht'
+        ws[f'D{start_row}'] = 'Schulform'
+        ws[f'E{start_row}'] = 'IB'
+        ws[f'F{start_row}'] = 'Wohnort'
+
+        for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+            ws[f'{col}{start_row}'].font = Font(bold=True)
+            ws[f'{col}{start_row}'].fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
+
+        # Schüler eintragen
+        row = start_row + 1
+        for student in sorted(class_data['students'], key=lambda s: (s['lastname'], s['firstname'])):
+            schulform = student.get('schulform', '')
+            is_ib = 'Ja' if schulform == 'IB' else ''
+            ws[f'A{row}'] = student['lastname']
+            ws[f'B{row}'] = student['firstname']
+            ws[f'C{row}'] = student.get('gender', '')
+            ws[f'D{row}'] = schulform
+            ws[f'E{row}'] = is_ib
+            ws[f'F{row}'] = student.get('wohnort', '')
+            row += 1
+
+        # Spaltenbreite anpassen
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 12
+        ws.column_dimensions['E'].width = 8
+        ws.column_dimensions['F'].width = 30
+
+    # Speichern in BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'klasseneinteilung_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    )
+
+def generate_csv_export(proposal):
+    """Generiert CSV-Export"""
+    from flask import make_response
+    import csv
+    from io import StringIO
+
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+
+    # Header
+    writer.writerow(['Klasse', 'Nachname', 'Vorname', 'Geschlecht', 'Schulform', 'IB', 'Wohnort', 'Religion'])
+
+    # Schüler pro Klasse
+    for class_data in proposal['classes']:
+        class_name = f"5{chr(96 + class_data['number'])}"
+        for student in sorted(class_data['students'], key=lambda s: (s['lastname'], s['firstname'])):
+            schulform = student.get('schulform', '')
+            is_ib = 'Ja' if schulform == 'IB' else ''
+            writer.writerow([
+                class_name,
+                student['lastname'],
+                student['firstname'],
+                student.get('gender', ''),
+                schulform,
+                is_ib,
+                student.get('wohnort', ''),
+                student.get('religion', '')
+            ])
+
+    # Response erstellen
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=klasseneinteilung_{datetime.now().strftime("%Y%m%d")}.csv'
+
+    return response
+
+def generate_pdf_export(proposal):
+    """Generiert PDF-Export mit ReportLab"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
+    from flask import send_file
+    import unicodedata
+
+    def normalize_text(text):
+        """Normalisiert Text für PDF-Export (entfernt diakritische Zeichen)"""
+        if not text:
+            return text
+        # NFD = Normalization Form Decomposed - trennt Buchstaben von diakritischen Zeichen
+        # Dann filtern wir nur die Basis-Buchstaben heraus
+        nfd = unicodedata.normalize('NFD', text)
+        return ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
+
+    # PDF erstellen
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Titel-Style
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#1d1d1f'),
+        spaceAfter=20
+    )
+
+    # Pro Klasse eine Seite
+    for idx, class_data in enumerate(proposal['classes']):
+        class_name = f"5{chr(96 + class_data['number'])}"
+
+        # Titel
+        elements.append(Paragraph(f"Klasse {class_name}", title_style))
+
+        # Statistiken
+        stats_data = [
+            ['Gesamt:', f"{class_data['count']} Schueler"],
+            ['Maennlich:', str(class_data['gender_count']['m'])],
+            ['Weiblich:', str(class_data['gender_count']['w'])]
+        ]
+
+        stats_table = Table(stats_data, colWidths=[4*cm, 4*cm])
+        stats_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6c757d')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(stats_table)
+        elements.append(Spacer(1, 0.5*cm))
+
+        # Schülerliste
+        student_data = [['Nachname', 'Vorname', 'Geschlecht', 'Schulform', 'IB']]
+        for student in sorted(class_data['students'], key=lambda s: (s['lastname'], s['firstname'])):
+            schulform = student.get('schulform', '')
+            is_ib = 'Ja' if schulform == 'IB' else ''
+            student_data.append([
+                normalize_text(student['lastname']),
+                normalize_text(student['firstname']),
+                student.get('gender', ''),
+                schulform,
+                is_ib
+            ])
+
+        student_table = Table(student_data, colWidths=[5*cm, 5*cm, 2.5*cm, 2.5*cm, 2*cm])
+        student_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f5f5f7')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1d1d1f')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e0e0e0')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fafafa')])
+        ]))
+        elements.append(student_table)
+
+        # Seitenumbruch nach jeder Klasse außer der letzten
+        if idx < len(proposal['classes']) - 1:
+            elements.append(PageBreak())
+
+    # PDF generieren
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'klasseneinteilung_{datetime.now().strftime("%Y%m%d")}.pdf'
+    )
+
+@app.route('/check_conflicts', methods=['POST'])
+@login_required
+def check_conflicts():
+    """Check for conflicts after student movement"""
+    data = request.get_json()
+    student_id = data.get('student_id')
+    target_class = data.get('target_class')
+    modifications = data.get('modifications', {})
+
+    conflicts = []
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+
+        # Get student data
+        cursor.execute('SELECT * FROM students WHERE id = ?', (student_id,))
+        student = cursor.fetchone()
+
+        if not student:
+            return jsonify({'conflicts': []})
+
+        # Get all parent wishes for this student
+        cursor.execute('''
+            SELECT pw.*,
+                   s1.firstname || ' ' || s1.lastname as student_name,
+                   s2.firstname || ' ' || s2.lastname as related_student_name
+            FROM parent_wishes pw
+            JOIN students s1 ON pw.student_id = s1.id
+            LEFT JOIN students s2 ON pw.related_student_id = s2.id
+            WHERE pw.student_id = ? OR pw.related_student_id = ?
+        ''', (student_id, student_id))
+        wishes = cursor.fetchall()
+
+        # Check friend wishes
+        for wish in wishes:
+            if wish['wish_type'] == 'together':
+                # Check if both students would still be in same class
+                related_id = wish['related_student_id']
+                if related_id:
+                    # Check if related student was also moved
+                    related_new_class = modifications.get(str(related_id), {}).get('to')
+                    if related_new_class and related_new_class != target_class:
+                        conflicts.append({
+                            'type': 'friend_wish',
+                            'severity': 'high',
+                            'message': f"{wish['student_name']} möchte mit {wish['related_student_name']} zusammen sein"
+                        })
+
+            elif wish['wish_type'] == 'separated':
+                # Check if students would be in same class
+                related_id = wish['related_student_id']
+                if related_id:
+                    related_new_class = modifications.get(str(related_id), {}).get('to')
+                    if related_new_class == target_class:
+                        conflicts.append({
+                            'type': 'separation_wish',
+                            'severity': 'high',
+                            'message': f"{wish['student_name']} soll von {wish['related_student_name']} getrennt sein"
+                        })
+
+        # Note: Full conflict checking would require the current proposal data
+        # which is not easily accessible here. For now, we focus on wish-based conflicts.
+        # Additional checks (IB limits, gender balance, inclusion) would need the complete
+        # class composition, which should be tracked in the frontend or passed with the request.
+
+        db.close()
+
+        return jsonify({'conflicts': conflicts})
+
+    except Exception as e:
+        return jsonify({'conflicts': [], 'error': str(e)}), 500
+
+@app.route('/suggest_swaps', methods=['POST'])
+@login_required
+def suggest_swaps():
+    """Generate swap suggestions to resolve conflicts"""
+    data = request.get_json()
+    student_id = data.get('student_id')
+    target_class = data.get('target_class')
+    modifications = data.get('modifications', {})
+
+    suggestions = []
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+
+        # Get student data
+        cursor.execute('SELECT * FROM students WHERE id = ?', (student_id,))
+        student = cursor.fetchone()
+
+        if not student:
+            return jsonify({'suggestions': []})
+
+        # Get related students from wishes
+        cursor.execute('''
+            SELECT DISTINCT s2.id, s2.firstname, s2.lastname, pw.wish_type
+            FROM parent_wishes pw
+            JOIN students s2 ON (pw.related_student_id = s2.id OR pw.student_id = s2.id)
+            WHERE (pw.student_id = ? OR pw.related_student_id = ?)
+            AND s2.id != ?
+        ''', (student_id, student_id, student_id))
+        related_students = cursor.fetchall()
+
+        # Suggestion 1: Move friend together
+        for related in related_students:
+            if related['wish_type'] == 'together':
+                suggestions.append({
+                    'description': f"Verschiebe {related['firstname']} {related['lastname']} ebenfalls in die gleiche Klasse",
+                    'score': 85,
+                    'action': 'move_together',
+                    'student_ids': [related['id']]
+                })
+
+        # Suggestion 2: Move to alternative class
+        cursor.execute('SELECT COUNT(DISTINCT id) as total FROM students')
+        total_students = cursor.fetchone()['total']
+        num_classes = max(1, (total_students + 24) // 25)
+
+        for i in range(num_classes):
+            if str(i) != target_class:
+                suggestions.append({
+                    'description': f"Verschiebe Schüler stattdessen in Klasse 5{chr(97 + i)}",
+                    'score': 60,
+                    'action': 'move_to_alternative',
+                    'class_id': str(i)
+                })
+
+        # Suggestion 3: Revert move
+        suggestions.append({
+            'description': "Änderung rückgängig machen und ursprüngliche Einteilung beibehalten",
+            'score': 50,
+            'action': 'revert'
+        })
+
+        db.close()
+
+        # Sort by score
+        suggestions = sorted(suggestions, key=lambda s: s['score'], reverse=True)[:3]
+
+        return jsonify({'suggestions': suggestions})
+
+    except Exception as e:
+        return jsonify({'suggestions': [], 'error': str(e)}), 500
 
 @app.route('/users')
 @login_required
@@ -1268,7 +2117,8 @@ def add_user():
                 if cursor.fetchone():
                     flash('Benutzername existiert bereits.', 'danger')
                 else:
-                    password_hash = generate_password_hash(password)
+                    # Use pbkdf2 instead of scrypt for compatibility
+                    password_hash = generate_password_hash(password, method='pbkdf2:sha256')
                     cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
                                  (username, password_hash))
                     db.commit()

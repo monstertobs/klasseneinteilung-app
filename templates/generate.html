@@ -44,6 +44,11 @@
                 <input type="checkbox" name="religion_group" id="religion_group" value="1" {% if options.religion_group %}checked{% endif %}>
                 Religion zusammen gruppieren
             </label>
+
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="religion_bundle" id="religion_bundle" value="1" {% if options.get('religion_bundle') %}checked{% endif %}>
+                Religion-B&uuml;ndelung (Ethik mit Konfessionen)
+            </label>
         </div>
 
         <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-top: 0.75rem;">
@@ -52,11 +57,43 @@
                 Sportklasse (Klasse 1)
             </label>
 
-            <label style="display: flex; align-items: center; gap: 0.5rem;">
-                Max. Schüler mit Förderbedarf pro Klasse:
-                <input type="number" name="max_inklusion" min="0" max="20" value="{{ options.max_inklusion }}" style="width: 4rem;" class="form-control">
-                <span style="color: #6c757d; font-size: 0.875rem;">(0 = kein Limit)</span>
-            </label>
+            <strong>Spezialklassen:</strong>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    Sportklassen:
+                    <select name="specialized_sport_count" class="form-control" style="width: 6rem;">
+                        {% for i in range(11) %}
+                        <option value="{{ i }}" {% if options.get('specialized_classes', {}).get('sport', 0) == i %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    Weitere Spezialklasse:
+                    <input type="text" name="specialized_custom_name" placeholder="z.B. Bläserklasse" value="{{ options.get('specialized_classes', {}).get('custom_name', '') }}" style="width: 12rem;" class="form-control">
+                    Anzahl:
+                    <select name="specialized_custom_count" class="form-control" style="width: 6rem;">
+                        {% for i in range(11) %}
+                        <option value="{{ i }}" {% if options.get('specialized_classes', {}).get('custom', 0) == i %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-top: 0.75rem;">
+            <div>
+
+            <div>
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    IB-Sch&uuml;ler Verteilung:
+                    <input type="number" name="ib_min" min="0" max="20" value="{{ options.get('ib_min', 2) }}" style="width: 4rem;" class="form-control">
+                    bis
+                    <input type="number" name="ib_max" min="0" max="20" value="{{ options.get('ib_max', 5) }}" style="width: 4rem;" class="form-control">
+                    pro Klasse
+                    <span style="color: #6c757d; font-size: 0.875rem;">(0/0 = kein Limit, empfohlen: 2-5)</span>
+                </label>
+            </div>
         </div>
 
         <div style="margin-top: 1rem;">
@@ -66,19 +103,52 @@
 </div>
 
 <script>
-    // Religion verteilen und gruppieren schließen sich gegenseitig aus
+    // Religion-Optionen schließen sich gegenseitig aus
     const distCheckbox = document.getElementById('religion_distribute');
     const groupCheckbox = document.getElementById('religion_group');
+    const bundleCheckbox = document.getElementById('religion_bundle');
 
     distCheckbox.addEventListener('change', function() {
         if (this.checked) {
             groupCheckbox.checked = false;
+            bundleCheckbox.checked = false;
         }
     });
 
     groupCheckbox.addEventListener('change', function() {
         if (this.checked) {
             distCheckbox.checked = false;
+            bundleCheckbox.checked = false;
+        }
+    });
+
+    bundleCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            distCheckbox.checked = false;
+            groupCheckbox.checked = false;
+        }
+    });
+
+    // Export dropdown toggle
+    function toggleExportMenu(index) {
+        const menu = document.getElementById('export-menu-' + index);
+        const isVisible = menu.style.display === 'block';
+
+        // Schließe alle anderen Dropdowns
+        document.querySelectorAll('.export-dropdown').forEach(function(dropdown) {
+            dropdown.style.display = 'none';
+        });
+
+        // Toggle dieses Dropdown
+        menu.style.display = isVisible ? 'none' : 'block';
+    }
+
+    // Schließe Dropdown bei Klick außerhalb
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.export-container')) {
+            document.querySelectorAll('.export-dropdown').forEach(function(dropdown) {
+                dropdown.style.display = 'none';
+            });
         }
     });
 </script>
@@ -96,16 +166,22 @@
 
         <div class="classes-grid">
             {% for class in proposal.classes %}
-            <div class="class-card">
+            <div class="class-card"
+                 data-class-id="{{ loop.index0 }}"
+                 data-class-name="5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}">
                 <div class="class-header">
-                    <h4>Klasse 5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}{% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}</h4>
+                    <h4>
+                        Klasse 5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}
+                        {% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}
+                        {% if class.special_type == 'sport' %} <span style="font-size: 0.8em;">&#9917;</span>{% endif %}
+                        {% if class.special_type == 'custom' %} <span style="font-size: 0.8em; color: #6c757d;">({{ class.custom_name }})</span>{% endif %}
+                    </h4>
                     <span class="class-count">{{ class.count }} Sch&uuml;ler</span>
                 </div>
 
                 <div class="gender-distribution">
                     <span class="gender-stat">M {{ class.gender_count.m }}</span>
                     <span class="gender-stat">W {{ class.gender_count.w }}</span>
-                    <span class="gender-stat">D {{ class.gender_count.d }}</span>
                 </div>
 
                 {% if class.schulform_count and (class.schulform_count.H + class.schulform_count.R + class.schulform_count.G + class.schulform_count.IB) > 0 %}
@@ -120,7 +196,7 @@
                     <span class="gender-stat" title="Gymnasium">G {{ class.schulform_count.G }}</span>
                     {% endif %}
                     {% if class.schulform_count.IB > 0 %}
-                    <span class="gender-stat" title="Inklusive Beschulung">IB {{ class.schulform_count.IB }}</span>
+                    <span class="gender-stat" title="Inklusiv beschulte Sch&uuml;ler">IB {{ class.schulform_count.IB }}</span>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -129,7 +205,6 @@
                     <span class="gender-stat" title="Ethik">E {{ class.religion_count.ethik }}</span>
                     <span class="gender-stat" title="Katholisch">K {{ class.religion_count.katholisch }}</span>
                     <span class="gender-stat" title="Evangelisch">Ev {{ class.religion_count.evangelisch }}</span>
-                    <span class="gender-stat" title="Sch&uuml;ler mit F&ouml;rderbedarf">Förderb. {{ class.inklusion_count }}</span>
                     <span class="gender-stat" title="Sportliche Sch&uuml;ler">Sport {{ class.sport_count }}</span>
                 </div>
 
@@ -153,8 +228,25 @@
 
                 <div class="student-list">
                     {% for student in class.students %}
-                    <div class="student-item">
+                    <div class="student-item"
+                         draggable="true"
+                         data-student-id="{{ student.id }}"
+                         data-student-name="{{ student.lastname }}, {{ student.firstname }}"
+                         data-gender="{{ student.gender or 'd' }}"
+                         data-special-needs="{{ 'true' if student.special_needs else 'false' }}"
+                         data-schulform="{{ student.schulform or '' }}">
                         {{ student.lastname }}, {{ student.firstname }}
+
+                        {% if student.schulform == 'H' %}
+                        <span class="special-badge" title="Hauptschule" style="background: #6c757d;">H</span>
+                        {% elif student.schulform == 'R' %}
+                        <span class="special-badge" title="Realschule" style="background: #0dcaf0;">R</span>
+                        {% elif student.schulform == 'G' %}
+                        <span class="special-badge" title="Gymnasium" style="background: #198754;">G</span>
+                        {% elif student.schulform == 'IB' %}
+                        <span class="special-badge" title="Inklusiv beschulter Sch&uuml;ler" style="background: #fd7e14; font-weight: 700;">IB</span>
+                        {% endif %}
+
                         {% if student.special_needs == 'hoerschaedigung' %}
                         <span class="special-badge" title="H&ouml;rsch&auml;digung" style="background: #dc3545;">H</span>
                         {% elif student.special_needs == 'sprache' %}
@@ -174,8 +266,33 @@
         </div>
 
         <div class="proposal-actions">
-            <button class="btn btn-secondary" onclick="window.print()">Drucken</button>
-            <button class="btn btn-primary">Ausw&auml;hlen</button>
+            <div class="export-container" style="position: relative; display: inline-block;">
+                <button type="button" class="btn btn-secondary" onclick="toggleExportMenu({{ loop.index0 }})">
+                    Export
+                </button>
+                <div id="export-menu-{{ loop.index0 }}" class="export-dropdown" style="display: none;">
+                    <form method="POST" action="{{ url_for('export_classes', format_type='excel') }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="proposal_index" value="{{ loop.index0 }}">
+                        <button type="submit" class="export-option">Excel</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('export_classes', format_type='csv') }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="proposal_index" value="{{ loop.index0 }}">
+                        <button type="submit" class="export-option">CSV</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('export_classes', format_type='pdf') }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="proposal_index" value="{{ loop.index0 }}">
+                        <button type="submit" class="export-option">PDF</button>
+                    </form>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('save_assignment') }}" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="proposal_index" value="{{ loop.index0 }}">
+                <button type="submit" class="btn btn-primary">Ausw&auml;hlen</button>
+            </form>
         </div>
     </div>
     {% endfor %}
@@ -185,11 +302,18 @@
     <h4>Hinweise zur Einteilung</h4>
     <ul>
         <li>Die drei Vorschl&auml;ge ber&uuml;cksichtigen die oben gew&auml;hlten Optionen</li>
-        <li><strong>Priorit&auml;ten:</strong> Geschlecht > Schulweg/Wohnort > Freundew&uuml;nsche > Schulform > Religion</li>
-        <li><strong>Schulformen:</strong> H = Hauptschule, R = Realschule, G = Gymnasium, IB = Inklusive Beschulung</li>
-        <li><strong>F&ouml;rderbedarf:</strong> H = H&ouml;rsch&auml;digung, S = Sprache, SE = Sozial/Emotional, L = Lernen</li>
+        <li><strong>Maximale Klassengr&ouml;&szlig;e:</strong> 25 Sch&uuml;ler pro Klasse (automatisch berechnet)</li>
+        <li><strong>Priorit&auml;ten:</strong> Geschlecht > Stadt-Gruppierung > Freundew&uuml;nsche > Schulform > Religion</li>
+        <li><strong>Schulformen:</strong> H = Hauptschule, R = Realschule, G = Gymnasium, IB = Inklusiv beschulte Sch&uuml;ler</li>
+        <li><strong>Sch&uuml;ler-Badges:</strong> Farbige Badges zeigen Schulform (H/R/G/IB) und F&ouml;rderbedarf (H/S/SE/L)</li>
         <li><strong>Religion:</strong> E = Ethik, K = Katholisch, Ev = Evangelisch</li>
+        <li><strong>Spezialklassen:</strong> &#9917; = Sport, weitere Spezialklasse frei w&auml;hlbar</li>
+        <li><strong>Religion-B&uuml;ndelung:</strong> Verhindert reine Ethik-Klassen, f&uuml;r mehr Vielfalt</li>
+        <li><strong>IB Min/Max:</strong> Klassen haben entweder 0 oder zwischen Min-Max IB-Sch&uuml;ler (Standard: 2-5)</li>
+        <li><strong>Export:</strong> Klicken Sie auf "Export" f&uuml;r Excel, CSV oder PDF-Dateien</li>
         <li>&Auml;ndern Sie die Optionen und klicken Sie &bdquo;Neu generieren&ldquo; f&uuml;r andere Ergebnisse</li>
     </ul>
 </div>
+
+<script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
 {% endblock %}

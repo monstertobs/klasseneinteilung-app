@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}{{ assignment.name }} — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{{ assignment.name }}</h2>
+        <p>Erstellt von {{ assignment.username }} am {{ assignment.created_at }}</p>
+    </div>
+    <div>
+        <a href="{{ url_for('assignments') }}" class="btn btn-secondary">Zurück zur Übersicht</a>
+    </div>
+</div>
+
+<div class="proposals-container">
+    <div class="proposal-card">
+        <h3 style="margin-bottom: 1.5rem; color: #1d1d1f; font-size: 1.25rem;">
+            {{ num_classes }} Klassen
+        </h3>
+
+        <div class="classes-grid">
+            {% for class in proposal.classes %}
+            <div class="class-card">
+                <div class="class-header">
+                    <h4>
+                        Klasse 5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}
+                        {% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}
+                        {% if class.special_type == 'sport' %} <span style="font-size: 0.8em;">&#9917;</span>{% endif %}
+                        {% if class.special_type == 'custom' %} <span style="font-size: 0.8em; color: #6c757d;">({{ class.custom_name }})</span>{% endif %}
+                    </h4>
+                    <span class="class-count">{{ class.count }} Schüler</span>
+                </div>
+
+                <div class="class-stats">
+                    <div class="gender-distribution">
+                        <span class="gender-stat" title="Männlich">♂ {{ class.gender_count.m }}</span>
+                        <span class="gender-stat" title="Weiblich">♀ {{ class.gender_count.w }}</span>
+                    </div>
+                </div>
+
+                {% if class.schulform_count and (class.schulform_count.H > 0 or class.schulform_count.R > 0 or class.schulform_count.G > 0 or class.schulform_count.IB > 0) %}
+                <div class="gender-distribution" style="margin-top: 0.25rem;">
+                    {% if class.schulform_count.H > 0 %}
+                    <span class="gender-stat" title="Hauptschule">H {{ class.schulform_count.H }}</span>
+                    {% endif %}
+                    {% if class.schulform_count.R > 0 %}
+                    <span class="gender-stat" title="Realschule">R {{ class.schulform_count.R }}</span>
+                    {% endif %}
+                    {% if class.schulform_count.G > 0 %}
+                    <span class="gender-stat" title="Gymnasium">G {{ class.schulform_count.G }}</span>
+                    {% endif %}
+                    {% if class.schulform_count.IB > 0 %}
+                    <span class="gender-stat" title="Inklusiv beschulte Sch&uuml;ler">IB {{ class.schulform_count.IB }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="gender-distribution" style="margin-top: 0.25rem;">
+                    <span class="gender-stat" title="Ethik">E {{ class.religion_count.ethik }}</span>
+                    <span class="gender-stat" title="Katholisch">K {{ class.religion_count.katholisch }}</span>
+                    <span class="gender-stat" title="Evangelisch">Ev {{ class.religion_count.evangelisch }}</span>
+                    <span class="gender-stat" title="Sportliche Sch&uuml;ler">Sport {{ class.sport_count }}</span>
+                </div>
+
+                {% if class.city_count and class.city_count|length > 0 %}
+                <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #e9ecef;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        📍 Wohnorte ({{ class.city_count|length }} Städte)
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                        {% for city, count in class.city_count.items()|sort(attribute='1', reverse=True) %}
+                        <span style="background: #f5f5f7; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; color: #1d1d1f;">
+                            {{ city }} <strong style="color: #007aff;">({{ count }})</strong>
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="student-list">
+                    {% for student in class.students %}
+                    <div class="student-item">
+                        {{ student.lastname }}, {{ student.firstname }}
+
+                        {% if student.schulform == 'H' %}
+                        <span class="special-badge" title="Hauptschule" style="background: #6c757d;">H</span>
+                        {% elif student.schulform == 'R' %}
+                        <span class="special-badge" title="Realschule" style="background: #0dcaf0;">R</span>
+                        {% elif student.schulform == 'G' %}
+                        <span class="special-badge" title="Gymnasium" style="background: #198754;">G</span>
+                        {% elif student.schulform == 'IB' %}
+                        <span class="special-badge" title="Inklusiv beschulter Sch&uuml;ler" style="background: #fd7e14; font-weight: 700;">IB</span>
+                        {% endif %}
+
+                        {% if student.special_needs == 'hoerschaedigung' %}
+                        <span class="special-badge" title="H&ouml;rsch&auml;digung" style="background: #dc3545;">H</span>
+                        {% elif student.special_needs == 'sprache' %}
+                        <span class="special-badge" title="Sprache" style="background: #fd7e14;">S</span>
+                        {% elif student.special_needs == 'sozial_emotional' %}
+                        <span class="special-badge" title="Sozial/Emotional" style="background: #6f42c1;">SE</span>
+                        {% elif student.special_needs == 'lernen' %}
+                        <span class="special-badge" title="Lernen" style="background: #0d6efd;">L</span>
+                        {% elif student.special_needs %}
+                        <span class="special-badge" title="{{ student.special_needs }}">!</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="proposal-actions" style="margin-top: 2rem;">
+            <div class="export-container" style="position: relative; display: inline-block;">
+                <button type="button" class="btn btn-secondary" onclick="toggleExportMenu(0)">
+                    Export
+                </button>
+                <div id="export-menu-0" class="export-dropdown" style="display: none;">
+                    <form method="POST" action="{{ url_for('export_saved_assignment', assignment_id=assignment.id, format_type='excel') }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="export-option">Excel</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('export_saved_assignment', assignment_id=assignment.id, format_type='csv') }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="export-option">CSV</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('export_saved_assignment', assignment_id=assignment.id, format_type='pdf') }}" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="export-option">PDF</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Export dropdown toggle
+function toggleExportMenu(index) {
+    const menu = document.getElementById('export-menu-' + index);
+    const isVisible = menu.style.display === 'block';
+
+    // Schließe alle anderen Dropdowns
+    document.querySelectorAll('.export-dropdown').forEach(function(dropdown) {
+        dropdown.style.display = 'none';
+    });
+
+    menu.style.display = isVisible ? 'none' : 'block';
+}
+
+// Schließe Dropdown bei Klick außerhalb
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.export-container')) {
+        document.querySelectorAll('.export-dropdown').forEach(function(dropdown) {
+            dropdown.style.display = 'none';
+        });
+    }
+});
+</script>
+{% endblock %}

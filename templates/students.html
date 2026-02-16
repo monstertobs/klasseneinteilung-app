@@ -6,9 +6,11 @@
 <div class="page-header">
     <div>
         <h2>Sch&uuml;ler verwalten</h2>
-        <p>{{ students|length }} Sch&uuml;ler insgesamt</p>
+        <p><span id="student-count">{{ students|length }}</span> Sch&uuml;ler insgesamt <span id="selected-count" style="display:none; color: #007aff; font-weight: 600;">(<span id="selected-number">0</span> ausgew&auml;hlt)</span></p>
     </div>
     <div style="display: flex; gap: 0.5rem;">
+        <button id="delete-selected-btn" class="btn btn-danger" style="display:none;" onclick="deleteSelected()">Ausgew&auml;hlte l&ouml;schen</button>
+        <button class="btn btn-danger" onclick="deleteAll()">Alle l&ouml;schen</button>
         <a href="{{ url_for('import_students') }}" class="btn btn-secondary">Importieren</a>
         <a href="{{ url_for('add_student') }}" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</a>
     </div>
@@ -19,6 +21,9 @@
     <table class="data-table">
         <thead>
             <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" title="Alle ausw&auml;hlen">
+                </th>
                 <th>Nr.</th>
                 <th>Nachname</th>
                 <th>Vorname</th>
@@ -35,6 +40,9 @@
         <tbody>
             {% for student in students %}
             <tr {% if student.import_batch_id %}class="imported-student"{% endif %}>
+                <td>
+                    <input type="checkbox" class="student-checkbox" data-student-id="{{ student.id }}" onchange="updateSelectedCount()">
+                </td>
                 <td>{{ loop.index }}</td>
                 <td>
                     <strong>{{ student.lastname }}</strong>
@@ -49,7 +57,7 @@
                     {% elif student.gender == 'w' %}
                         Weiblich
                     {% else %}
-                        Divers
+                        —
                     {% endif %}
                 </td>
                 <td>{{ student.wohnort or '—' }}</td>
@@ -115,6 +123,131 @@
     <a href="{{ url_for('add_student') }}" class="btn btn-primary">Ersten Sch&uuml;ler hinzuf&uuml;gen</a>
 </div>
 {% endif %}
+
+<script>
+// Alle auswählen Toggle
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateSelectedCount();
+}
+
+// Update selected count display
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    const selected = Array.from(checkboxes).filter(cb => cb.checked);
+    const count = selected.length;
+
+    const selectedCountSpan = document.getElementById('selected-count');
+    const selectedNumberSpan = document.getElementById('selected-number');
+    const deleteBtn = document.getElementById('delete-selected-btn');
+
+    selectedNumberSpan.textContent = count;
+
+    if (count > 0) {
+        selectedCountSpan.style.display = 'inline';
+        deleteBtn.style.display = 'inline-block';
+    } else {
+        selectedCountSpan.style.display = 'none';
+        deleteBtn.style.display = 'none';
+    }
+
+    // Update "Alle auswählen" checkbox
+    const selectAllCheckbox = document.getElementById('select-all');
+    selectAllCheckbox.checked = count === checkboxes.length && count > 0;
+}
+
+// Ausgewählte Schüler löschen
+function deleteSelected() {
+    const checkboxes = document.querySelectorAll('.student-checkbox:checked');
+    const count = checkboxes.length;
+
+    if (count === 0) {
+        alert('Bitte wählen Sie mindestens einen Schüler aus.');
+        return;
+    }
+
+    const studentIds = Array.from(checkboxes).map(cb => cb.dataset.studentId);
+    const studentNames = Array.from(checkboxes).map(cb => {
+        const row = cb.closest('tr');
+        const lastname = row.cells[3].textContent.trim();
+        const firstname = row.cells[4].textContent.trim();
+        return lastname + ', ' + firstname;
+    });
+
+    // Bestätigungs-Dialog
+    const message = count === 1
+        ? 'Möchten Sie wirklich diesen Schüler löschen?\n\n' + studentNames[0] + '\n\nDieser Vorgang kann nicht rückgängig gemacht werden!'
+        : 'Möchten Sie wirklich ' + count + ' Schüler löschen?\n\nDies umfasst:\n' + studentNames.slice(0, 5).join('\n') + (count > 5 ? '\n... und ' + (count - 5) + ' weitere' : '') + '\n\nDieser Vorgang kann nicht rückgängig gemacht werden!';
+
+    if (!confirm(message)) {
+        return;
+    }
+
+    // Lösche via POST
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("delete_multiple_students") }}';
+
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = '{{ csrf_token() }}';
+    form.appendChild(csrfInput);
+
+    studentIds.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'student_ids';
+        input.value = id;
+        form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Alle Schüler löschen
+function deleteAll() {
+    const totalCount = {{ students|length }};
+
+    if (totalCount === 0) {
+        alert('Es sind keine Schüler vorhanden.');
+        return;
+    }
+
+    // Bestätigungs-Dialog mit doppelter Absicherung
+    const message = '⚠️ WARNUNG: Alle Schüler löschen\n\nSie sind dabei, ALLE ' + totalCount + ' Schüler zu löschen!\n\nDieser Vorgang kann NICHT rückgängig gemacht werden!\n\nMöchten Sie wirklich fortfahren?';
+
+    if (!confirm(message)) {
+        return;
+    }
+
+    // Zweite Bestätigung
+    const confirmation = prompt('Bitte geben Sie "ALLE LÖSCHEN" ein, um zu bestätigen:');
+
+    if (confirmation !== 'ALLE LÖSCHEN') {
+        alert('Abgebrochen. Die Schüler wurden nicht gelöscht.');
+        return;
+    }
+
+    // Lösche via POST
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("delete_all_students") }}';
+
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = '{{ csrf_token() }}';
+    form.appendChild(csrfInput);
+
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
 
 <style>
 .imported-student {

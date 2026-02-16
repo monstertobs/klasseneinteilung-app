@@ -13,7 +13,7 @@ import os
 
 # WICHTIG: Passen Sie diesen Pfad an Ihre virtuelle Umgebung an!
 # Beispiel: /home/username/klasseneinteilung-app/venv/bin/python3
-INTERP = "/pfad/zu/ihrem/venv/bin/python3"
+INTERP = "/home/f018021b/klasseneinteilung-app/venv/bin/python3"
 
 # Python-Interpreter wechseln, falls nötig
 if sys.executable != INTERP:
@@ -21,7 +21,7 @@ if sys.executable != INTERP:
 
 # WICHTIG: Passen Sie diesen Pfad an Ihr Projektverzeichnis an!
 # Beispiel: /home/username/klasseneinteilung-app
-sys.path.insert(0, '/pfad/zu/ihrem/projektverzeichnis')
+sys.path.insert(0, '/home/f018021b/klasseneinteilung-app')
 
 # Umgebungsvariablen setzen (optional)
 os.environ['FLASK_ENV'] = 'production'

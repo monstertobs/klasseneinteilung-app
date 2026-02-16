@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Über &amp; Kontakt — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Über die Anwendung</h2>
+    <p>Informationen zum Projekt und Kontaktdaten</p>
+</div>
+
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <h3 style="margin-top: 0;">Klasseneinteilung App</h3>
+
+    <div style="margin: 2rem 0;">
+        <h4 style="color: #007aff; margin-bottom: 0.5rem;">📋 Projekt-Informationen</h4>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 0.75rem 0; font-weight: 500; color: #666;">Name:</td>
+                <td style="padding: 0.75rem 0;">Klasseneinteilung App</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 0.75rem 0; font-weight: 500; color: #666;">Version:</td>
+                <td style="padding: 0.75rem 0;">2.0.0</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 0.75rem 0; font-weight: 500; color: #666;">Release Datum:</td>
+                <td style="padding: 0.75rem 0;">13. Februar 2026</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 0.75rem 0; font-weight: 500; color: #666;">Status:</td>
+                <td style="padding: 0.75rem 0;">
+                    <span style="background: #34c759; color: white; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">Stable</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 0.75rem 0; font-weight: 500; color: #666;">Lizenz:</td>
+                <td style="padding: 0.75rem 0;">Proprietary - Alle Rechte vorbehalten</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin: 2rem 0; padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+        <h4 style="margin-top: 0; color: white;">👤 Autor &amp; Kontakt</h4>
+        <div style="font-size: 1.05rem;">
+            <p style="margin: 0.5rem 0;"><strong>Tobias Meier</strong></p>
+            <p style="margin: 0.5rem 0;">
+                📧 Email: <a href="mailto:admin(at)secutobs.com" style="color: white; text-decoration: underline;">admin(at)secutobs.com</a>
+            </p>
+        </div>
+        <p style="margin-top: 1.5rem; margin-bottom: 0; font-size: 0.9rem; opacity: 0.9;">
+            Für Support, Fragen, Feedback oder Feature-Requests kontaktieren Sie mich gerne per Email.
+        </p>
+    </div>
+
+    <div style="margin: 2rem 0;">
+        <h4 style="color: #007aff; margin-bottom: 0.5rem;">✨ Features (Version 2.0.0)</h4>
+        <ul style="line-height: 1.8; color: #333;">
+            <li><strong>Export-Funktion</strong> - Excel, CSV, PDF</li>
+            <li><strong>Spezialklassen</strong> - Sport, Musik, Theater</li>
+            <li><strong>Religion-Bündelung</strong> - Vielfalt fördern</li>
+            <li><strong>IB Min/Max-Einschränkungen</strong> - Flexible Verteilung</li>
+            <li><strong>Drag &amp; Drop</strong> - Interaktive Vorschau</li>
+            <li><strong>Konflikt-Erkennung</strong> - Automatische Checks</li>
+        </ul>
+    </div>
+
+    <div style="margin: 2rem 0;">
+        <h4 style="color: #007aff; margin-bottom: 0.5rem;">🔒 Datenschutz &amp; Sicherheit</h4>
+        <p style="color: #555; line-height: 1.6;">
+            Die Klasseneinteilung App ist <strong>DSGVO-konform</strong> und entspricht den deutschen Datenschutzbestimmungen (HDSG, HSchG § 83). Alle Daten werden ausschließlich lokal auf Ihrem Server gespeichert. Es erfolgt keine Übertragung an Dritte.
+        </p>
+        <p style="color: #555; line-height: 1.6; margin-top: 1rem;">
+            <strong>Sicherheits-Features:</strong>
+        </p>
+        <ul style="color: #555; line-height: 1.6;">
+            <li>CSRF-Schutz (Flask-WTF)</li>
+            <li>Rate Limiting (Brute-Force-Schutz)</li>
+            <li>Sichere Sessions (HttpOnly, SameSite)</li>
+            <li>Starke Passwort-Anforderungen</li>
+            <li>pbkdf2:sha256 Password Hashing</li>
+        </ul>
+    </div>
+
+    <div style="margin: 2rem 0; padding: 1.5rem; background: #f5f7fa; border-radius: 12px; border-left: 4px solid #007aff;">
+        <h4 style="margin-top: 0; color: #007aff;">📚 Dokumentation</h4>
+        <p style="color: #555; margin: 0.5rem 0;">Weitere Informationen finden Sie in:</p>
+        <ul style="color: #555; line-height: 1.8;">
+            <li><strong>VERSION_HISTORY.md</strong> - Vollständige Versionshistorie</li>
+            <li><strong>IMPLEMENTATION_SUMMARY.md</strong> - Technische Details</li>
+            <li><strong>CLAUDE.md</strong> - Entwickler-Dokumentation</li>
+            <li><strong>README.md</strong> - Projekt-Übersicht</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0; text-align: center; color: #999; font-size: 0.9rem;">
+        <p style="margin: 0;">
+            Copyright &copy; 2026 Tobias Meier. Alle Rechte vorbehalten.
+        </p>
+        <p style="margin: 0.5rem 0 0 0;">
+            Klasseneinteilung App v2.0.0
+        </p>
+    </div>
+</div>
+
+<div style="margin-top: 2rem; text-align: center;">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Zurück zum Dashboard</a>
+</div>
+{% endblock %}

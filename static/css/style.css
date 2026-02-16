@@ -903,6 +903,205 @@ textarea.form-control {
     }
 }
 
+/* ---- Drag & Drop Styles ---- */
+.student-item[draggable="true"] {
+    cursor: grab;
+    transition: opacity 0.2s, background 0.2s;
+    user-select: none;
+}
+
+.student-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.student-item[draggable="true"]:hover {
+    background: rgba(0, 122, 255, 0.05);
+}
+
+.student-item.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+}
+
+.class-card.drag-over {
+    border: 2px solid #007aff;
+    background: rgba(0, 122, 255, 0.03);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+/* ---- Conflict Dialog ---- */
+.conflict-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+}
+
+.conflict-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 2rem;
+    z-index: 1000;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.conflict-dialog h3 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.conflict-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem 0;
+}
+
+.conflict-item {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.conflict-item::before {
+    content: '⚠️';
+    flex-shrink: 0;
+}
+
+.conflict-high {
+    background: rgba(255, 159, 10, 0.1);
+    border-left: 4px solid var(--color-warning);
+    color: var(--color-text);
+}
+
+.conflict-critical {
+    background: rgba(255, 59, 48, 0.1);
+    border-left: 4px solid var(--color-danger);
+    color: var(--color-text);
+}
+
+.conflict-medium {
+    background: rgba(0, 113, 227, 0.06);
+    border-left: 4px solid var(--color-accent);
+    color: var(--color-text);
+}
+
+.conflict-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+/* ---- Suggestions ---- */
+.suggestions-list {
+    margin-bottom: 1.5rem;
+}
+
+.suggestion-item {
+    padding: 1rem;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--color-border);
+}
+
+.suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.suggestion-score {
+    background: var(--color-accent);
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.suggestion-item p {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+
+/* ---- Modification Indicator ---- */
+.modification-indicator {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: rgba(255, 159, 10, 0.1);
+    border: 1px solid rgba(255, 159, 10, 0.3);
+    border-radius: var(--radius-sm);
+    margin-top: 1rem;
+}
+
+.modification-indicator span {
+    color: var(--color-warning);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* ---- Export Dropdown ---- */
+.export-container {
+    position: relative;
+    display: inline-block;
+}
+
+.export-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    margin-top: 0.25rem;
+    min-width: 150px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.export-option {
+    display: block;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    font-family: var(--font-family);
+    font-size: 0.9rem;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.export-option:hover {
+    background: var(--color-bg-secondary);
+}
+
 /* ---- Print Styles ---- */
 @media print {
     .navbar,
