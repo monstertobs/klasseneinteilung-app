@@ -37,3 +37,21 @@ test_*.py
 *.swp
 *.swo
 *~
+
+# ZIP packages
+*.zip
+
+# Internal project files
+CLEANUP-BERICHT.txt
+ROLLOUT-CHECKLISTE.txt
+
+# Security reports (contain vulnerability details)
+SECURITY-AUDIT-REPORT.md
+SECURITY-FIXES-*.md
+SECURITY-UPDATES.md
+
+# Session storage
+flask_session/
+
+# Initial password file
+.initial_password

@@ -78,13 +78,22 @@
         </div>
 
         <div class="form-group">
+            <label>
+                <input type="checkbox" name="ikl" value="1" {% if student.ikl %}checked{% endif %}>
+                IKL-Status (Intensivklasse / Sprachf&ouml;rderung)
+            </label>
+        </div>
+
+        <div class="form-group">
             <label for="special_needs">Inklusiver F&ouml;rderbedarf</label>
             <select id="special_needs" name="special_needs" class="form-control">
                 <option value="">Keiner</option>
-                <option value="hoerschaedigung" {% if student.special_needs == 'hoerschaedigung' %}selected{% endif %}>H&ouml;rsch&auml;digung</option>
+                <option value="hoerschaedigung" {% if student.special_needs == 'hoerschaedigung' %}selected{% endif %}>H&ouml;ren</option>
                 <option value="sprache" {% if student.special_needs == 'sprache' %}selected{% endif %}>Sprache</option>
-                <option value="sozial_emotional" {% if student.special_needs == 'sozial_emotional' %}selected{% endif %}>Sozial/Emotional</option>
+                <option value="sozial_emotional" {% if student.special_needs == 'sozial_emotional' %}selected{% endif %}>Sozial/Emotional (ESE)</option>
                 <option value="lernen" {% if student.special_needs == 'lernen' %}selected{% endif %}>Lernen</option>
+                <option value="sehen" {% if student.special_needs == 'sehen' %}selected{% endif %}>Sehen</option>
+                <option value="kme" {% if student.special_needs == 'kme' %}selected{% endif %}>KME (k&ouml;rperlich-motorisch)</option>
             </select>
         </div>
 

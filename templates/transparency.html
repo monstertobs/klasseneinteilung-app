@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Transparenz &mdash; Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        {% if source == 'generate' %}
+        <a href="{{ url_for('generate') }}" class="btn btn-secondary" style="margin-bottom: 0.75rem; display: inline-block;">&larr; Zur&uuml;ck zu den Vorschl&auml;gen</a>
+        <h2>Transparenz &ndash; Vorschlag {{ proposal_idx + 1 }}</h2>
+        {% else %}
+        <a href="{{ url_for('view_assignment', assignment_id=assignment.id) }}" class="btn btn-secondary" style="margin-bottom: 0.75rem; display: inline-block;">&larr; Zur&uuml;ck zur Einteilung</a>
+        <h2>Transparenz &ndash; {{ assignment.name }}</h2>
+        {% endif %}
+        <p style="color: var(--color-text-secondary);">Warum wurde jeder Sch&uuml;ler in diese Klasse eingeteilt?</p>
+    </div>
+</div>
+
+{# --- Legende --- #}
+<div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); margin-right: 0.5rem;">Legende:</span>
+    <span class="badge badge-success">&#10003; Wunsch erf&uuml;llt</span>
+    <span class="badge badge-danger">&#10007; Wunsch nicht erf&uuml;llt</span>
+    <span class="badge badge-info">Schulweg</span>
+    <span class="badge badge-warning">Schulform / Sport</span>
+    <span class="badge badge-dark">IB / F&ouml;rderbedarf</span>
+    <span class="badge badge-secondary">Geschlechterbalance</span>
+</div>
+
+{# --- Klassen-Filter-Tabs --- #}
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center;">
+    <button class="btn btn-primary filter-btn active" data-filter="all" onclick="filterClass('all', this)">
+        Alle
+    </button>
+    {% for cls in proposal.classes %}
+    {% set class_name = '5' + 'abcdefghijklmnopqrstuvwxyz'[cls.number - 1] %}
+    <button class="btn btn-secondary filter-btn" data-filter="{{ class_name }}" onclick="filterClass('{{ class_name }}', this)">
+        {{ class_name }}
+    </button>
+    {% endfor %}
+
+    {# Suche #}
+    <div style="margin-left: auto;">
+        <input type="text" id="student-search" placeholder="Name suchen&hellip;" class="form-control" style="width: 220px;" oninput="filterSearch()">
+    </div>
+</div>
+
+{# --- Tabelle --- #}
+<div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm);">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: var(--color-bg-secondary); border-bottom: 1px solid var(--color-border);">
+                <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Nachname</th>
+                <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Vorname</th>
+                <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Klasse</th>
+                <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Einteilungsgr&uuml;nde</th>
+            </tr>
+        </thead>
+        <tbody id="transparency-tbody">
+            {% for cls in proposal.classes %}
+            {% set class_name = '5' + 'abcdefghijklmnopqrstuvwxyz'[cls.number - 1] %}
+            {% for student in cls.students | sort(attribute='lastname') %}
+            <tr class="transparency-row"
+                data-class="{{ class_name }}"
+                data-name="{{ (student.lastname + ' ' + student.firstname) | lower }}"
+                style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 0.65rem 1rem; font-weight: 500;">{{ student.lastname }}</td>
+                <td style="padding: 0.65rem 1rem;">{{ student.firstname }}</td>
+                <td style="padding: 0.65rem 1rem;">
+                    <span class="badge badge-info">{{ class_name }}</span>
+                </td>
+                <td style="padding: 0.65rem 1rem;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                        {% for reason in student.reasons %}
+                        {% if reason.type == 'wish_ok' %}
+                        <span class="badge badge-success">{{ reason.text }}</span>
+                        {% elif reason.type == 'wish_fail' %}
+                        <span class="badge badge-danger">{{ reason.text }}</span>
+                        {% elif reason.type == 'wohnort' %}
+                        <span class="badge badge-info">{{ reason.text }}</span>
+                        {% elif reason.type in ('schulform', 'sport') %}
+                        <span class="badge badge-warning">{{ reason.text }}</span>
+                        {% elif reason.type in ('ib', 'special_needs') %}
+                        <span class="badge badge-dark">{{ reason.text }}</span>
+                        {% elif reason.type == 'gender' %}
+                        <span class="badge badge-secondary">{{ reason.text }}</span>
+                        {% else %}
+                        <span class="badge">{{ reason.text }}</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div id="no-results" style="display: none; padding: 2rem; text-align: center; color: var(--color-text-secondary);">
+        Keine Sch&uuml;ler gefunden.
+    </div>
+</div>
+
+<p style="margin-top: 1rem; font-size: 0.8rem; color: var(--color-text-secondary);">
+    Gesamt: <strong id="visible-count">{{ proposal.statistics.total_students }}</strong> Sch&uuml;ler
+</p>
+
+<script>
+var currentFilter = 'all';
+var currentSearch = '';
+
+function filterClass(cls, btn) {
+    currentFilter = cls;
+    document.querySelectorAll('.filter-btn').forEach(function(b) {
+        b.classList.remove('active');
+        b.classList.add('btn-secondary');
+        b.classList.remove('btn-primary');
+    });
+    btn.classList.add('active');
+    btn.classList.remove('btn-secondary');
+    btn.classList.add('btn-primary');
+    applyFilters();
+}
+
+function filterSearch() {
+    currentSearch = document.getElementById('student-search').value.toLowerCase();
+    applyFilters();
+}
+
+function applyFilters() {
+    var rows = document.querySelectorAll('.transparency-row');
+    var visible = 0;
+    rows.forEach(function(row) {
+        var matchClass = (currentFilter === 'all') || (row.dataset.class === currentFilter);
+        var matchName = !currentSearch || row.dataset.name.indexOf(currentSearch) !== -1;
+        if (matchClass && matchName) {
+            row.style.display = '';
+            visible++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    document.getElementById('visible-count').textContent = visible;
+    document.getElementById('no-results').style.display = (visible === 0) ? 'block' : 'none';
+}
+</script>
+{% endblock %}

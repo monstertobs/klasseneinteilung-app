@@ -6,6 +6,55 @@
 
 ---
 
+## Version 2.1.0 - Algorithm & Transparency Release
+**Release Date:** February 21, 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### 🎉 Major Features Added
+
+#### **1. Transparency Page (Transparenzseite)**
+- New page showing exactly why each student was assigned to their class
+- Color-coded badges per reason: fulfilled/failed wishes, school route, school type, gender balance, IB, special needs
+- Filter by class tab and full-text search
+- Accessible from both proposal preview and saved assignment view
+- **New Routes:** `/generate/transparency/<idx>`, `/assignments/<id>/transparency`
+- **New File:** `templates/transparency.html`
+- **New Functions:** `compute_transparency()`, `find_student_in_classes()`
+
+#### **2. Algorithm Optimization — 90%+ Wish Fulfillment**
+- **Post-processing swap optimizer** (`optimize_assignment_wishes()`): iteratively swaps same-gender students between classes until no further improvement is possible (up to 60 rounds)
+- **Smart initial ordering**: students most-wished-for by others are placed first, so classmates can follow them
+- **Bidirectional wish checking**: if student A wishes to be with B, this now also scores positively when placing B
+- **Increased wish weights**: together +150 (was +20), separated -500 (was -20)
+- **Result**: wish fulfillment rate improved from ~57% to 90–93%
+- **Files:** `app.py` (+120 lines)
+
+#### **3. Parent Wishes Import Fix**
+- Fixed critical bug: Excel import silently failed to create wishes due to wrong DB column names (`notes`/`created_by` → `description`)
+- Wishes from "Freund/Freundin" and "Auf keinen Fall mit Kind..." columns now reliably imported
+- **Files:** `app.py`
+
+### 🔧 Technical Improvements
+
+- **CSS:** Added `.badge-secondary` and `.badge-dark` classes for transparency badges
+- **Statistics recomputed** after swap optimization to ensure correct display
+- **Files:** `static/css/style.css`, `templates/generate.html`, `templates/view_assignment.html`
+
+### 📊 Statistics
+
+- **Files Created:** 1 (`transparency.html`)
+- **Files Modified:** 4
+- **Lines Added:** ~200
+- **New Routes:** 2
+- **Bug Fixes:** 1 (critical import bug)
+
+### 🐛 Bug Fixes
+
+- Fixed: Parent wishes from Excel import not being saved (wrong column name `notes` → `description`)
+
+---
+
 ## Version 2.0.0 - Feature Extension Release
 **Release Date:** February 13, 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -205,14 +254,13 @@ This release adds 6 major features to enhance the class assignment system with a
 
 ## Roadmap
 
-### Version 2.1.0 (Planned)
+### Version 2.2.0 (Planned)
 - [ ] Advanced conflict resolution strategies
-- [ ] Class balancing optimizer
 - [ ] Batch import improvements
 - [ ] Export customization options
 - [ ] Performance optimizations for large datasets
 
-### Version 2.2.0 (Planned)
+### Version 2.3.0 (Planned)
 - [ ] Teacher assignment integration
 - [ ] Room allocation
 - [ ] Timetable integration
@@ -272,6 +320,6 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Last Updated:** February 13, 2026
-**Current Version:** 2.0.0
+**Last Updated:** February 21, 2026
+**Current Version:** 2.1.0
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>

@@ -83,24 +83,48 @@
                     <div class="student-item">
                         {{ student.lastname }}, {{ student.firstname }}
 
+                        {% if student.ikl %}
+                        <span class="special-badge" title="IKL-Status: Intensivklasse / Sprachf&ouml;rderung" style="background: #0ea5e9; color: #fff; font-weight: 700;">IKL</span>
+                        {% endif %}
+
                         {% if student.schulform == 'H' %}
                         <span class="special-badge" title="Hauptschule" style="background: #6c757d;">H</span>
                         {% elif student.schulform == 'R' %}
                         <span class="special-badge" title="Realschule" style="background: #0dcaf0;">R</span>
                         {% elif student.schulform == 'G' %}
                         <span class="special-badge" title="Gymnasium" style="background: #198754;">G</span>
-                        {% elif student.schulform == 'IB' %}
+                        {% elif student.schulform == 'IB' and not student.special_needs %}
                         <span class="special-badge" title="Inklusiv beschulter Sch&uuml;ler" style="background: #fd7e14; font-weight: 700;">IB</span>
                         {% endif %}
 
-                        {% if student.special_needs == 'hoerschaedigung' %}
-                        <span class="special-badge" title="H&ouml;rsch&auml;digung" style="background: #dc3545;">H</span>
-                        {% elif student.special_needs == 'sprache' %}
-                        <span class="special-badge" title="Sprache" style="background: #fd7e14;">S</span>
+                        {% if student.schulform == 'IB' and student.special_needs %}
+                        {% if student.special_needs == 'lernen' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: Lernen">IB·L</span>
                         {% elif student.special_needs == 'sozial_emotional' %}
-                        <span class="special-badge" title="Sozial/Emotional" style="background: #6f42c1;">SE</span>
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: ESE">IB·E</span>
+                        {% elif student.special_needs == 'sprache' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: Sprache">IB·Sp</span>
+                        {% elif student.special_needs == 'kme' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: K&ouml;rperlich-motorisch">IB·K</span>
+                        {% elif student.special_needs == 'sehen' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: Sehen">IB·Se</span>
+                        {% elif student.special_needs == 'hoerschaedigung' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: H&ouml;ren">IB·H</span>
+                        {% else %}
+                        <span class="special-badge ib-focus-badge" title="IB">IB</span>
+                        {% endif %}
+                        {% elif student.special_needs == 'hoerschaedigung' %}
+                        <span class="special-badge" title="H&ouml;ren" style="background: #dc3545;">H</span>
+                        {% elif student.special_needs == 'sprache' %}
+                        <span class="special-badge" title="Sprache" style="background: #fd7e14;">Sp</span>
+                        {% elif student.special_needs == 'sozial_emotional' %}
+                        <span class="special-badge" title="ESE" style="background: #6f42c1;">E</span>
                         {% elif student.special_needs == 'lernen' %}
                         <span class="special-badge" title="Lernen" style="background: #0d6efd;">L</span>
+                        {% elif student.special_needs == 'sehen' %}
+                        <span class="special-badge" title="Sehen" style="background: #20c997;">Se</span>
+                        {% elif student.special_needs == 'kme' %}
+                        <span class="special-badge" title="K&ouml;rperlich-motorisch" style="background: #6c757d;">K</span>
                         {% elif student.special_needs %}
                         <span class="special-badge" title="{{ student.special_needs }}">!</span>
                         {% endif %}
@@ -112,6 +136,7 @@
         </div>
 
         <div class="proposal-actions" style="margin-top: 2rem;">
+            <a href="{{ url_for('assignment_transparency', assignment_id=assignment.id) }}" class="btn btn-secondary">Transparenz</a>
             <div class="export-container" style="position: relative; display: inline-block;">
                 <button type="button" class="btn btn-secondary" onclick="toggleExportMenu(0)">
                     Export

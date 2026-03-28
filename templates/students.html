@@ -8,9 +8,10 @@
         <h2>Sch&uuml;ler verwalten</h2>
         <p><span id="student-count">{{ students|length }}</span> Sch&uuml;ler insgesamt <span id="selected-count" style="display:none; color: #007aff; font-weight: 600;">(<span id="selected-number">0</span> ausgew&auml;hlt)</span></p>
     </div>
-    <div style="display: flex; gap: 0.5rem;">
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
         <button id="delete-selected-btn" class="btn btn-danger" style="display:none;" onclick="deleteSelected()">Ausgew&auml;hlte l&ouml;schen</button>
         <button class="btn btn-danger" onclick="deleteAll()">Alle l&ouml;schen</button>
+        <button class="btn btn-testdata" onclick="openTestdataModal()" title="Fiktive Testsch&uuml;ler f&uuml;r Demozwecke generieren">&#x1F9EA; Testdaten</button>
         <a href="{{ url_for('import_students') }}" class="btn btn-secondary">Importieren</a>
         <a href="{{ url_for('add_student') }}" class="btn btn-primary">Sch&uuml;ler hinzuf&uuml;gen</a>
     </div>
@@ -24,16 +25,16 @@
                 <th style="width: 40px;">
                     <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" title="Alle ausw&auml;hlen">
                 </th>
-                <th>Nr.</th>
+                <th class="hide-mobile">Nr.</th>
                 <th>Nachname</th>
                 <th>Vorname</th>
-                <th>Geschlecht</th>
-                <th>Wohnort</th>
+                <th class="hide-mobile">Geschlecht</th>
+                <th class="hide-mobile">Wohnort</th>
                 <th>Schulform</th>
-                <th>Religion</th>
-                <th>Sportlich</th>
+                <th class="hide-mobile">Religion</th>
+                <th class="hide-mobile">Sportlich</th>
                 <th>F&ouml;rderbedarf</th>
-                <th>Notizen</th>
+                <th class="hide-mobile">Notizen</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
@@ -43,7 +44,7 @@
                 <td>
                     <input type="checkbox" class="student-checkbox" data-student-id="{{ student.id }}" onchange="updateSelectedCount()">
                 </td>
-                <td>{{ loop.index }}</td>
+                <td class="hide-mobile">{{ loop.index }}</td>
                 <td>
                     <strong>{{ student.lastname }}</strong>
                     {% if student.import_batch_id %}
@@ -51,7 +52,7 @@
                     {% endif %}
                 </td>
                 <td>{{ student.firstname }}</td>
-                <td>
+                <td class="hide-mobile">
                     {% if student.gender == 'm' %}
                         M&auml;nnlich
                     {% elif student.gender == 'w' %}
@@ -60,21 +61,21 @@
                         —
                     {% endif %}
                 </td>
-                <td>{{ student.wohnort or '—' }}</td>
+                <td class="hide-mobile">{{ student.wohnort or '—' }}</td>
                 <td>
                     {% if student.schulform == 'H' %}
-                        Hauptschule
+                        H
                     {% elif student.schulform == 'R' %}
-                        Realschule
+                        R
                     {% elif student.schulform == 'G' %}
-                        Gymnasium
+                        G
                     {% elif student.schulform == 'IB' %}
-                        Inkl. Beschulung
+                        IB
                     {% else %}
                         —
                     {% endif %}
                 </td>
-                <td>
+                <td class="hide-mobile">
                     {% if student.religion == 'ethik' %}
                         Ethik
                     {% elif student.religion == 'katholisch' %}
@@ -85,7 +86,7 @@
                         —
                     {% endif %}
                 </td>
-                <td>{% if student.sportlich %}Ja{% else %}—{% endif %}</td>
+                <td class="hide-mobile">{% if student.sportlich %}Ja{% else %}—{% endif %}</td>
                 <td>
                     {% if student.special_needs == 'hoerschaedigung' %}
                         H&ouml;rsch&auml;digung
@@ -101,7 +102,7 @@
                         —
                     {% endif %}
                 </td>
-                <td>{{ student.notes or '—' }}</td>
+                <td class="hide-mobile">{{ student.notes or '—' }}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
                         <a href="{{ url_for('edit_student', student_id=student.id) }}" class="btn btn-secondary btn-sm">Bearbeiten</a>
@@ -249,15 +250,101 @@ function deleteAll() {
 }
 </script>
 
+<!-- ══ Testdaten-Modal ══════════════════════════════════════════ -->
+<div id="testdata-modal" class="modal-overlay" style="display:none;" onclick="closeTestdataModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-header testdata-header">
+            <span>&#x1F9EA; Testdaten generieren</span>
+            <button class="modal-close" onclick="closeTestdataModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="testdata-warning">
+                <strong>&#x26A0;&#xFE0F; Nur f&uuml;r Testzwecke!</strong>
+                Es werden <em>fiktive Namen</em> generiert – keine echten Sch&uuml;lerdaten.
+                Testdaten sind jederzeit &uuml;ber &bdquo;Testdaten l&ouml;schen&ldquo; wieder entfernbar.
+            </div>
+
+            <form method="POST" action="{{ url_for('generate_testdata') }}" id="testdata-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <label for="td-anzahl">Anzahl Sch&uuml;lerinnen &amp; Sch&uuml;ler</label>
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <input type="range" id="td-range" min="10" max="300" value="100"
+                               oninput="document.getElementById('td-anzahl').value=this.value"
+                               style="flex:1;">
+                        <input type="number" id="td-anzahl" name="anzahl" min="10" max="300" value="100"
+                               oninput="document.getElementById('td-range').value=this.value"
+                               style="width:70px; padding:0.4rem 0.6rem; border:1px solid #ddd; border-radius:6px; font-size:1rem; text-align:center;">
+                    </div>
+                </div>
+
+                <fieldset class="td-options">
+                    <legend>Optionen</legend>
+                    <label class="td-check">
+                        <input type="checkbox" name="with_ib" value="1" checked>
+                        <span><strong>IB-Sch&uuml;ler</strong> einschlie&szlig;en <small>(ca. 10%)</small></span>
+                    </label>
+                    <label class="td-check">
+                        <input type="checkbox" name="with_vm" value="1" checked>
+                        <span><strong>Vorbeugende Ma&szlig;nahmen</strong> <small>(VM, ca. 12 Sch&uuml;ler)</small></span>
+                    </label>
+                    <label class="td-check">
+                        <input type="checkbox" name="with_foerder" value="1" checked>
+                        <span><strong>F&ouml;rderbedarf</strong> einschlie&szlig;en <small>(ca. 8%)</small></span>
+                    </label>
+                    <label class="td-check">
+                        <input type="checkbox" name="with_wishes" value="1" checked>
+                        <span><strong>Elternw&uuml;nsche</strong> generieren <small>(25% zusammen, 10% getrennt)</small></span>
+                    </label>
+                </fieldset>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeTestdataModal()">Abbrechen</button>
+                    <button type="submit" class="btn btn-testdata-submit">&#x1F9EA; Jetzt generieren</button>
+                </div>
+            </form>
+
+            <!-- Testdaten löschen -->
+            <form method="POST" action="{{ url_for('delete_testdata') }}"
+                  onsubmit="return confirm('Alle Testdaten (Sch\u00fcler mit Batch-ID TESTDATA-*) und deren Elternw\u00fcnsche wirklich l\u00f6schen?');"
+                  style="margin-top:1rem; padding-top:1rem; border-top:1px solid #eee;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger btn-sm" style="width:100%;">
+                    &#x1F5D1; Alle Testdaten wieder l&ouml;schen
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openTestdataModal() {
+    document.getElementById('testdata-modal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeTestdataModal(event) {
+    if (event && event.target !== document.getElementById('testdata-modal')) return;
+    document.getElementById('testdata-modal').style.display = 'none';
+    document.body.style.overflow = '';
+}
+// ESC schließt Modal
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('testdata-modal').style.display = 'none';
+        document.body.style.overflow = '';
+    }
+});
+</script>
+
 <style>
 .imported-student {
     background-color: #e3f2fd !important;
 }
-
 .imported-student:hover {
     background-color: #bbdefb !important;
 }
-
 .badge-imported {
     display: inline-block;
     margin-left: 0.5rem;
@@ -270,5 +357,109 @@ function deleteAll() {
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+/* Testdaten-Button */
+.btn-testdata {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+.btn-testdata:hover { opacity: 0.88; }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.modal-box {
+    background: white;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+.testdata-header {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+.modal-close {
+    background: none; border: none;
+    color: white; font-size: 1.5rem;
+    cursor: pointer; line-height: 1;
+    padding: 0 0.25rem;
+    opacity: 0.85;
+}
+.modal-close:hover { opacity: 1; }
+.modal-body { padding: 1.5rem; }
+.testdata-warning {
+    background: #fff8e1;
+    border-left: 4px solid #f59e0b;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #7c5900;
+}
+.form-group { margin-bottom: 1.25rem; }
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+.td-options {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+}
+.td-options legend {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #555;
+    padding: 0 0.4rem;
+}
+.td-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin: 0.5rem 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.td-check input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+.td-check small { color: #888; }
+.modal-actions {
+    display: flex; gap: 0.75rem; justify-content: flex-end;
+}
+.btn-testdata-submit {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white; border: none; cursor: pointer;
+    padding: 0.6rem 1.4rem; border-radius: 8px;
+    font-size: 0.95rem; font-weight: 600;
+    transition: opacity 0.2s;
+}
+.btn-testdata-submit:hover { opacity: 0.88; }
 </style>
 {% endblock %}

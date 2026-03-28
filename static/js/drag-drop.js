@@ -7,27 +7,24 @@
 let proposalModifications = {};
 let draggedStudent = null;
 let originalClass = null;
+let pendingMove = null;
 
 /**
  * Initialize drag and drop on all student items
  */
 function initializeDragDrop() {
-    // Make all student items draggable
     const studentItems = document.querySelectorAll('.student-item[draggable="true"]');
     studentItems.forEach(item => {
         item.addEventListener('dragstart', handleDragStart);
         item.addEventListener('dragend', handleDragEnd);
     });
 
-    // Make all class cards droppable
     const classCards = document.querySelectorAll('.class-card');
     classCards.forEach(card => {
         card.addEventListener('dragover', handleDragOver);
         card.addEventListener('drop', handleDrop);
         card.addEventListener('dragleave', handleDragLeave);
     });
-
-    console.log('Drag & Drop initialized');
 }
 
 /**
@@ -50,7 +47,6 @@ function handleDragStart(event) {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/html', studentItem.innerHTML);
 
-    // Visual feedback
     studentItem.style.opacity = '0.4';
     studentItem.classList.add('dragging');
 }
@@ -61,8 +57,6 @@ function handleDragStart(event) {
 function handleDragEnd(event) {
     event.currentTarget.style.opacity = '1';
     event.currentTarget.classList.remove('dragging');
-
-    // Remove drag-over class from all class cards
     document.querySelectorAll('.class-card').forEach(card => {
         card.classList.remove('drag-over');
     });
@@ -72,20 +66,14 @@ function handleDragEnd(event) {
  * Handle drag over event
  */
 function handleDragOver(event) {
-    if (event.preventDefault) {
-        event.preventDefault();
-    }
-
+    if (event.preventDefault) event.preventDefault();
     const classCard = event.currentTarget;
-
-    // Don't allow drop on source class
     if (draggedStudent && classCard.dataset.classId !== draggedStudent.sourceClass) {
         event.dataTransfer.dropEffect = 'move';
         classCard.classList.add('drag-over');
     } else {
         event.dataTransfer.dropEffect = 'none';
     }
-
     return false;
 }
 
@@ -93,48 +81,252 @@ function handleDragOver(event) {
  * Handle drag leave event
  */
 function handleDragLeave(event) {
-    const classCard = event.currentTarget;
-    classCard.classList.remove('drag-over');
+    event.currentTarget.classList.remove('drag-over');
 }
 
 /**
- * Handle drop event
+ * Handle drop event — shows conflict preview BEFORE moving
  */
 function handleDrop(event) {
-    if (event.stopPropagation) {
-        event.stopPropagation();
-    }
-
+    if (event.stopPropagation) event.stopPropagation();
     event.preventDefault();
 
     const targetClassCard = event.currentTarget;
     const targetClass = targetClassCard.dataset.classId;
     const targetClassName = targetClassCard.dataset.className;
 
-    // Don't allow drop on same class
-    if (draggedStudent && targetClass !== draggedStudent.sourceClass) {
-        // Move the student element visually
-        moveStudentElement(draggedStudent, targetClassCard);
+    targetClassCard.classList.remove('drag-over');
 
-        // Update statistics
-        updateClassCounts(draggedStudent.sourceClass, targetClass, draggedStudent.id);
+    if (!draggedStudent || targetClass === draggedStudent.sourceClass) return false;
 
-        // Track modification
-        proposalModifications[draggedStudent.id] = {
-            from: draggedStudent.sourceClass,
-            to: targetClass,
-            studentName: draggedStudent.name
-        };
+    // Store pending move — execute only after user confirms in modal
+    pendingMove = {
+        student: draggedStudent,
+        targetClassCard: targetClassCard,
+        targetClass: targetClass,
+        targetClassName: targetClassName
+    };
 
-        // Check for conflicts
-        checkConflicts(draggedStudent.id, targetClass);
+    // Build current class state from DOM
+    const currentState = buildCurrentState();
 
-        // Show modification indicator
-        showModificationIndicator();
+    // Compute client-side impact (sizes, gender)
+    const impact = computeMoveImpact(draggedStudent, targetClass);
+
+    // Get conflicts from server, then show modal
+    fetchConflicts(draggedStudent.id, draggedStudent.sourceClass, targetClass, currentState, function(conflicts) {
+        showPreMoveModal(conflicts, impact);
+    });
+
+    return false;
+}
+
+/**
+ * Build a map of student_id -> class_id from the current DOM
+ */
+function buildCurrentState() {
+    const state = {};
+    document.querySelectorAll('.student-item[data-student-id]').forEach(item => {
+        const card = item.closest('.class-card');
+        if (card) state[item.dataset.studentId] = card.dataset.classId;
+    });
+    return state;
+}
+
+/**
+ * Compute class stats (size, gender) before and after the move
+ */
+function computeMoveImpact(student, targetClass) {
+    const studentEl = document.querySelector(`.student-item[data-student-id="${student.id}"]`);
+    const gender = studentEl ? studentEl.dataset.gender : null;
+    const isIB = studentEl ? studentEl.dataset.schulform === 'IB' : false;
+
+    function getStats(classId) {
+        const card = document.querySelector(`.class-card[data-class-id="${classId}"]`);
+        if (!card) return { total: 0, m: 0, w: 0, ib: 0, name: classId };
+        const items = card.querySelectorAll('.student-list .student-item');
+        let m = 0, w = 0, ib = 0;
+        items.forEach(s => {
+            if (s.dataset.gender === 'm') m++;
+            else if (s.dataset.gender === 'w') w++;
+            if (s.dataset.schulform === 'IB') ib++;
+        });
+        return { total: items.length, m, w, ib, name: card.dataset.className || classId };
     }
 
-    targetClassCard.classList.remove('drag-over');
-    return false;
+    const src = getStats(student.sourceClass);
+    const tgt = getStats(targetClass);
+
+    const gDelta = gender === 'm' ? { m: -1, w: 0 } : (gender === 'w' ? { m: 0, w: -1 } : { m: 0, w: 0 });
+    const ibDelta = isIB ? -1 : 0;
+
+    return {
+        studentName: student.name,
+        gender: gender,
+        isIB: isIB,
+        source: {
+            name: src.name,
+            before: src,
+            after: { total: src.total - 1, m: src.m + gDelta.m, w: src.w + gDelta.w, ib: src.ib + ibDelta }
+        },
+        target: {
+            name: tgt.name,
+            before: tgt,
+            after: { total: tgt.total + 1, m: tgt.m - gDelta.m, w: tgt.w - gDelta.w, ib: tgt.ib - ibDelta }
+        }
+    };
+}
+
+/**
+ * Fetch conflicts from server
+ */
+function fetchConflicts(studentId, sourceClass, targetClass, currentState, callback) {
+    const csrfToken = document.querySelector('[name="csrf_token"]').value;
+    fetch('/check_conflicts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({
+            student_id: studentId,
+            source_class: sourceClass,
+            target_class: targetClass,
+            current_state: currentState,
+            modifications: proposalModifications
+        })
+    })
+    .then(r => r.json())
+    .then(data => callback(data.conflicts || []))
+    .catch(() => callback([]));
+}
+
+/**
+ * Show the pre-move conflict preview modal
+ */
+function showPreMoveModal(conflicts, impact) {
+    // Remove any existing modal
+    closeMoveModal();
+
+    const hasConflicts = conflicts.length > 0;
+    const src = impact.source;
+    const tgt = impact.target;
+
+    // --- Impact section ---
+    let impactHTML = `
+        <div class="premove-impact">
+            <div class="premove-impact-row">
+                <span class="premove-class-name">${escapeHtml(src.name)}</span>
+                <span class="premove-arrow">→</span>
+                <span>${src.before.total} <span class="premove-dim">Schüler</span></span>
+                <span class="premove-arrow">→</span>
+                <span class="${src.after.total !== src.before.total ? 'premove-changed' : ''}">${src.after.total} <span class="premove-dim">Schüler</span></span>
+                <span class="premove-gender">M ${src.before.m} / W ${src.before.w} → M ${src.after.m} / W ${src.after.w}</span>
+            </div>
+            <div class="premove-impact-row">
+                <span class="premove-class-name">${escapeHtml(tgt.name)}</span>
+                <span class="premove-arrow">→</span>
+                <span>${tgt.before.total} <span class="premove-dim">Schüler</span></span>
+                <span class="premove-arrow">→</span>
+                <span class="${tgt.after.total !== tgt.before.total ? 'premove-changed' : ''}">${tgt.after.total} <span class="premove-dim">Schüler</span></span>
+                <span class="premove-gender">M ${tgt.before.m} / W ${tgt.before.w} → M ${tgt.after.m} / W ${tgt.after.w}</span>
+            </div>
+        </div>`;
+
+    // --- Conflicts section ---
+    let conflictsHTML = '';
+    if (hasConflicts) {
+        conflictsHTML = '<div class="premove-section-title premove-section-warn">⚠️ Konflikte</div><ul class="conflict-list">';
+        conflicts.forEach(c => {
+            const cls = c.severity === 'critical' ? 'conflict-critical' : (c.severity === 'high' ? 'conflict-high' : 'conflict-medium');
+            conflictsHTML += `<li class="conflict-item ${cls}">${escapeHtml(c.message)}</li>`;
+        });
+        conflictsHTML += '</ul>';
+    } else {
+        conflictsHTML = '<div class="premove-no-conflict">✅ Keine Elternwunsch-Konflikte erkannt</div>';
+    }
+
+    // --- Buttons ---
+    const moveLabel = hasConflicts ? 'Trotzdem verschieben' : 'Verschieben';
+    const moveBtnClass = hasConflicts ? 'btn btn-danger' : 'btn btn-primary';
+
+    const html = `
+        <div class="premove-header">
+            <span class="premove-icon">🔄</span>
+            <div>
+                <div class="premove-title">Schüler verschieben</div>
+                <div class="premove-subtitle">${escapeHtml(impact.studentName)}</div>
+            </div>
+        </div>
+        <div class="premove-route">${escapeHtml(src.name)} &rarr; ${escapeHtml(tgt.name)}</div>
+        <div class="premove-section-title">Auswirkungen auf Klassen</div>
+        ${impactHTML}
+        ${conflictsHTML}
+        <div class="conflict-actions">
+            <button class="btn btn-secondary" onclick="cancelPendingMove()">Abbrechen</button>
+            <button class="${moveBtnClass}" onclick="confirmPendingMove()">${moveLabel}</button>
+        </div>`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'conflict-overlay';
+    overlay.id = 'premove-overlay';
+    overlay.onclick = cancelPendingMove;
+
+    const dialog = document.createElement('div');
+    dialog.className = 'conflict-dialog';
+    dialog.id = 'premove-dialog';
+    dialog.innerHTML = html;
+    dialog.onclick = e => e.stopPropagation();
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(dialog);
+}
+
+/**
+ * Close the pre-move modal without moving
+ */
+function cancelPendingMove() {
+    closeMoveModal();
+    // Restore opacity of dragged student
+    if (pendingMove && pendingMove.student && pendingMove.student.element) {
+        pendingMove.student.element.style.opacity = '1';
+    }
+    pendingMove = null;
+    draggedStudent = null;
+}
+
+/**
+ * Confirm and execute the pending move
+ */
+function confirmPendingMove() {
+    closeMoveModal();
+    if (!pendingMove) return;
+    const { student, targetClassCard, targetClass } = pendingMove;
+
+    moveStudentElement(student, targetClassCard);
+    updateClassCounts(student.sourceClass, targetClass, student.id);
+
+    proposalModifications[student.id] = {
+        from: student.sourceClass,
+        to: targetClass,
+        studentName: student.name
+    };
+
+    showModificationIndicator();
+    pendingMove = null;
+    draggedStudent = null;
+}
+
+/**
+ * Remove the modal and overlay from DOM
+ */
+function closeMoveModal() {
+    const d = document.getElementById('premove-dialog');
+    const o = document.getElementById('premove-overlay');
+    if (d) d.remove();
+    if (o) o.remove();
+    // Also remove old-style conflict dialog if present
+    const cd = document.getElementById('conflict-dialog');
+    const co = document.querySelector('.conflict-overlay:not(#premove-overlay)');
+    if (cd) cd.remove();
+    if (co) co.remove();
 }
 
 /**
@@ -142,42 +334,32 @@ function handleDrop(event) {
  */
 function moveStudentElement(student, targetClassCard) {
     const studentList = targetClassCard.querySelector('.student-list');
+    if (!studentList) return;
 
-    if (studentList) {
-        // Remove from source
-        student.element.remove();
+    student.element.remove();
 
-        // Add to target (sorted by name)
-        const students = Array.from(studentList.querySelectorAll('.student-item'));
-        const studentName = student.name;
+    const students = Array.from(studentList.querySelectorAll('.student-item'));
+    const studentName = student.name;
 
-        let inserted = false;
-        for (let i = 0; i < students.length; i++) {
-            const currentName = students[i].dataset.studentName;
-            if (studentName.localeCompare(currentName, 'de') < 0) {
-                studentList.insertBefore(student.element, students[i]);
-                inserted = true;
-                break;
-            }
+    let inserted = false;
+    for (let i = 0; i < students.length; i++) {
+        if (studentName.localeCompare(students[i].dataset.studentName, 'de') < 0) {
+            studentList.insertBefore(student.element, students[i]);
+            inserted = true;
+            break;
         }
-
-        if (!inserted) {
-            studentList.appendChild(student.element);
-        }
-
-        // Flash animation
-        student.element.style.backgroundColor = 'rgba(0, 122, 255, 0.1)';
-        setTimeout(() => {
-            student.element.style.backgroundColor = '';
-        }, 500);
     }
+    if (!inserted) studentList.appendChild(student.element);
+
+    student.element.style.opacity = '1';
+    student.element.style.backgroundColor = 'rgba(0, 122, 255, 0.1)';
+    setTimeout(() => { student.element.style.backgroundColor = ''; }, 500);
 }
 
 /**
  * Update class statistics after move
  */
 function updateClassCounts(sourceClassId, targetClassId, studentId) {
-    // Get student data
     const studentElement = document.querySelector(`[data-student-id="${studentId}"]`);
     if (!studentElement) return;
 
@@ -185,43 +367,30 @@ function updateClassCounts(sourceClassId, targetClassId, studentId) {
     const hasSpecialNeeds = studentElement.dataset.specialNeeds === 'true';
     const isIB = studentElement.dataset.schulform === 'IB';
 
-    // Update source class
     const sourceCard = document.querySelector(`.class-card[data-class-id="${sourceClassId}"]`);
-    if (sourceCard) {
-        updateSingleClassCount(sourceCard, gender, hasSpecialNeeds, isIB, -1);
-    }
+    if (sourceCard) updateSingleClassCount(sourceCard, gender, hasSpecialNeeds, isIB, -1);
 
-    // Update target class
     const targetCard = document.querySelector(`.class-card[data-class-id="${targetClassId}"]`);
-    if (targetCard) {
-        updateSingleClassCount(targetCard, gender, hasSpecialNeeds, isIB, 1);
-    }
+    if (targetCard) updateSingleClassCount(targetCard, gender, hasSpecialNeeds, isIB, 1);
 }
 
 /**
  * Update counts for a single class
  */
 function updateSingleClassCount(classCard, gender, hasSpecialNeeds, isIB, delta) {
-    // Update total count
     const countBadge = classCard.querySelector('.class-count');
     if (countBadge) {
         const currentCount = parseInt(countBadge.textContent.match(/\d+/)[0]);
         countBadge.textContent = `${currentCount + delta} Schüler`;
     }
 
-    // Update gender distribution
     const genderStats = classCard.querySelectorAll('.gender-distribution .gender-stat');
     genderStats.forEach(stat => {
         const text = stat.textContent.trim();
-        if (text.startsWith('M ') && gender === 'm') {
-            updateStatBadge(stat, delta);
-        } else if (text.startsWith('W ') && gender === 'w') {
-            updateStatBadge(stat, delta);
-        } else if (text.includes('Förderb.') && hasSpecialNeeds) {
-            updateStatBadge(stat, delta);
-        } else if (text.startsWith('IB ') && isIB) {
-            updateStatBadge(stat, delta);
-        }
+        if (text.startsWith('M ') && gender === 'm') updateStatBadge(stat, delta);
+        else if (text.startsWith('W ') && gender === 'w') updateStatBadge(stat, delta);
+        else if (text.includes('Förderb.') && hasSpecialNeeds) updateStatBadge(stat, delta);
+        else if (text.startsWith('IB ') && isIB) updateStatBadge(stat, delta);
     });
 }
 
@@ -231,170 +400,9 @@ function updateSingleClassCount(classCard, gender, hasSpecialNeeds, isIB, delta)
 function updateStatBadge(statElement, delta) {
     const match = statElement.textContent.match(/(\d+)/);
     if (match) {
-        const currentValue = parseInt(match[1]);
-        const newValue = Math.max(0, currentValue + delta);
+        const newValue = Math.max(0, parseInt(match[1]) + delta);
         statElement.textContent = statElement.textContent.replace(/\d+/, newValue);
     }
-}
-
-/**
- * Check for conflicts via AJAX
- */
-function checkConflicts(studentId, targetClass) {
-    const csrfToken = document.querySelector('[name="csrf_token"]').value;
-
-    fetch('/check_conflicts', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            student_id: studentId,
-            target_class: targetClass,
-            modifications: proposalModifications
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.conflicts && data.conflicts.length > 0) {
-            showConflictDialog(data.conflicts, studentId, targetClass);
-        }
-    })
-    .catch(error => {
-        console.error('Error checking conflicts:', error);
-    });
-}
-
-/**
- * Show conflict dialog
- */
-function showConflictDialog(conflicts, studentId, targetClass) {
-    // Remove existing dialog
-    const existingDialog = document.getElementById('conflict-dialog');
-    if (existingDialog) {
-        existingDialog.remove();
-    }
-
-    // Create dialog
-    const dialog = document.createElement('div');
-    dialog.id = 'conflict-dialog';
-    dialog.className = 'conflict-dialog';
-
-    let conflictHTML = '<h3>⚠️ Konflikte erkannt</h3><ul class="conflict-list">';
-
-    conflicts.forEach(conflict => {
-        const severityClass = `conflict-${conflict.severity}`;
-        conflictHTML += `<li class="conflict-item ${severityClass}">${conflict.message}</li>`;
-    });
-
-    conflictHTML += '</ul>';
-    conflictHTML += `
-        <div class="conflict-actions">
-            <button class="btn btn-secondary" onclick="revertMove('${studentId}')">Rückgängig</button>
-            <button class="btn btn-danger" onclick="acceptConflicts()">Akzeptieren</button>
-            <button class="btn btn-primary" onclick="showSuggestions('${studentId}', '${targetClass}')">Lösungsvorschläge</button>
-        </div>
-    `;
-
-    dialog.innerHTML = conflictHTML;
-
-    // Add overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'conflict-overlay';
-    overlay.onclick = () => acceptConflicts();
-
-    document.body.appendChild(overlay);
-    document.body.appendChild(dialog);
-}
-
-/**
- * Revert a move
- */
-function revertMove(studentId) {
-    location.reload();
-}
-
-/**
- * Accept conflicts and close dialog
- */
-function acceptConflicts() {
-    const dialog = document.getElementById('conflict-dialog');
-    const overlay = document.querySelector('.conflict-overlay');
-
-    if (dialog) dialog.remove();
-    if (overlay) overlay.remove();
-}
-
-/**
- * Show solution suggestions
- */
-function showSuggestions(studentId, targetClass) {
-    const csrfToken = document.querySelector('[name="csrf_token"]').value;
-
-    fetch('/suggest_swaps', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify({
-            student_id: studentId,
-            target_class: targetClass,
-            modifications: proposalModifications
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.suggestions && data.suggestions.length > 0) {
-            displaySuggestions(data.suggestions);
-        } else {
-            alert('Keine Lösungsvorschläge verfügbar.');
-            acceptConflicts();
-        }
-    })
-    .catch(error => {
-        console.error('Error fetching suggestions:', error);
-        alert('Fehler beim Laden der Vorschläge.');
-    });
-}
-
-/**
- * Display solution suggestions
- */
-function displaySuggestions(suggestions) {
-    const dialog = document.getElementById('conflict-dialog');
-    if (!dialog) return;
-
-    let html = '<h3>💡 Lösungsvorschläge</h3>';
-    html += '<div class="suggestions-list">';
-
-    suggestions.forEach((suggestion, index) => {
-        html += `
-            <div class="suggestion-item">
-                <div class="suggestion-header">
-                    <strong>Vorschlag ${index + 1}</strong>
-                    <span class="suggestion-score">Score: ${suggestion.score}/100</span>
-                </div>
-                <p>${suggestion.description}</p>
-                <button class="btn btn-sm btn-primary" onclick="applySuggestion(${index})">Anwenden</button>
-            </div>
-        `;
-    });
-
-    html += '</div>';
-    html += '<button class="btn btn-secondary" onclick="acceptConflicts()">Schließen</button>';
-
-    dialog.innerHTML = html;
-}
-
-/**
- * Apply a suggestion
- */
-function applySuggestion(index) {
-    // Placeholder - would implement actual swap logic
-    alert('Vorschlag wird angewendet...');
-    acceptConflicts();
 }
 
 /**
@@ -402,29 +410,37 @@ function applySuggestion(index) {
  */
 function showModificationIndicator() {
     let indicator = document.getElementById('modification-indicator');
-
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'modification-indicator';
         indicator.className = 'modification-indicator';
         indicator.innerHTML = `
-            <span>⚠️ Änderungen im Vorschau-Modus</span>
+            <span></span>
             <button class="btn btn-sm btn-secondary" onclick="location.reload()">Verwerfen</button>
         `;
-
         const container = document.querySelector('.page-header');
-        if (container) {
-            container.appendChild(indicator);
-        }
+        if (container) container.appendChild(indicator);
     }
-
     const count = Object.keys(proposalModifications).length;
     indicator.querySelector('span').textContent = `⚠️ ${count} Änderung${count > 1 ? 'en' : ''} im Vorschau-Modus`;
 }
 
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// --- Legacy: keep old checkConflicts/showConflictDialog/revertMove/acceptConflicts
+// for any existing inline calls ---
+function checkConflicts(studentId, targetClass) { /* replaced by pre-move flow */ }
+function acceptConflicts() { closeMoveModal(); }
+function revertMove() { location.reload(); }
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if we're on the generate page
     if (document.querySelector('.class-card')) {
         initializeDragDrop();
     }

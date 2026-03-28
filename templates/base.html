@@ -16,18 +16,122 @@
             <div class="navbar-brand">
                 <h1>Klasseneinteilung</h1>
             </div>
-            <ul class="navbar-menu">
+            <button class="hamburger-btn" id="hamburger-btn" onclick="toggleNav()" aria-label="Menü">&#9776;</button>
+            <ul class="navbar-menu" id="navbar-menu">
                 <li><a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>
                 <li><a href="{{ url_for('students') }}" {% if request.endpoint in ['students', 'add_student'] %}class="active"{% endif %}>Sch&uuml;ler</a></li>
                 <li><a href="{{ url_for('wishes') }}" {% if request.endpoint in ['wishes', 'add_wish'] %}class="active"{% endif %}>Elternw&uuml;nsche</a></li>
                 <li><a href="{{ url_for('generate') }}" {% if request.endpoint == 'generate' %}class="active"{% endif %}>Einteilung</a></li>
-                <li><a href="{{ url_for('users') }}" {% if request.endpoint in ['users', 'add_user'] %}class="active"{% endif %}>Benutzer</a></li>
+                {% if session.is_admin %}<li><a href="{{ url_for('users') }}" {% if request.endpoint in ['users', 'add_user'] %}class="active"{% endif %}>Benutzer</a></li>{% endif %}
                 <li><a href="{{ url_for('algorithm') }}" {% if request.endpoint == 'algorithm' %}class="active"{% endif %}>Algorithmus</a></li>
                 <li><a href="{{ url_for('about') }}" {% if request.endpoint == 'about' %}class="active"{% endif %}>&Uuml;ber</a></li>
+                <li><a href="{{ url_for('change_password') }}" {% if request.endpoint == 'change_password' %}class="active"{% endif %}>Passwort</a></li>
+                <li class="session-timer-item">
+                    <span id="session-timer" class="session-timer session-timer-ok" title="Sitzung läuft ab in...">&#9203; 15:00</span>
+                </li>
                 <li><a href="{{ url_for('logout') }}" class="logout">Abmelden</a></li>
             </ul>
         </div>
     </nav>
+
+    <!-- Idle-Timeout Warnung (erscheint bei 60 Sekunden) -->
+    <div id="idle-warning" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:16px; padding:2rem 2.5rem; max-width:420px; width:90%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+            <div style="font-size:2.5rem; margin-bottom:0.75rem;">&#9203;</div>
+            <h3 style="margin:0 0 0.5rem 0; color:#1d1d1f;">Sitzung läuft ab</h3>
+            <p style="color:#555; margin:0 0 0.25rem 0;">Sie werden in</p>
+            <div id="idle-countdown" style="font-size:2.5rem; font-weight:700; color:#ff3b30; margin:0.5rem 0; font-variant-numeric:tabular-nums;">01:00</div>
+            <p style="color:#555; margin:0 0 1.5rem 0;">automatisch abgemeldet.</p>
+            <button onclick="resetIdleTimer()" style="background:#007aff; color:#fff; border:none; border-radius:10px; padding:0.75rem 2rem; font-size:1rem; font-weight:600; cursor:pointer; width:100%;">Weiter arbeiten</button>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var TOTAL_SECONDS = 15 * 60;  // 15 Minuten
+        var WARNING_SECONDS = 60;     // Warnung bei 60 Sekunden Rest
+        var logoutUrl = "{{ url_for('logout') }}";
+
+        var remaining = TOTAL_SECONDS;
+        var warningShown = false;
+        var ticker = null;
+
+        var timerEl = document.getElementById('session-timer');
+        var warningEl = document.getElementById('idle-warning');
+        var countdownEl = document.getElementById('idle-countdown');
+
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+        function formatTime(s) {
+            return pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+        }
+
+        function updateDisplay() {
+            if (!timerEl) return;
+            timerEl.textContent = '\u23F3 ' + formatTime(remaining);
+            if (remaining <= WARNING_SECONDS) {
+                timerEl.className = 'session-timer session-timer-danger';
+            } else if (remaining <= 5 * 60) {
+                timerEl.className = 'session-timer session-timer-warning';
+            } else {
+                timerEl.className = 'session-timer session-timer-ok';
+            }
+        }
+
+        function tick() {
+            remaining--;
+            updateDisplay();
+
+            if (remaining <= 0) {
+                window.location.href = logoutUrl;
+                return;
+            }
+
+            if (remaining <= WARNING_SECONDS && !warningShown) {
+                warningShown = true;
+                if (warningEl) warningEl.style.display = 'flex';
+            }
+
+            if (warningShown && countdownEl) {
+                countdownEl.textContent = formatTime(remaining);
+            }
+        }
+
+        function resetIdleTimer() {
+            remaining = TOTAL_SECONDS;
+            warningShown = false;
+            updateDisplay();
+            if (warningEl) warningEl.style.display = 'none';
+        }
+
+        // Aktivitätsereignisse setzen Timer zurück
+        var events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+        events.forEach(function(evt) {
+            document.addEventListener(evt, resetIdleTimer, { passive: true });
+        });
+
+        // Globale Funktion für den "Weiter arbeiten"-Button
+        window.resetIdleTimer = resetIdleTimer;
+
+        // Ticker starten
+        updateDisplay();
+        ticker = setInterval(tick, 1000);
+    })();
+
+    // Hamburger Menü
+    function toggleNav() {
+        var menu = document.getElementById('navbar-menu');
+        menu.classList.toggle('nav-open');
+    }
+    // Menü schließen wenn außerhalb geklickt
+    document.addEventListener('click', function(e) {
+        var menu = document.getElementById('navbar-menu');
+        var btn = document.getElementById('hamburger-btn');
+        if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+            menu.classList.remove('nav-open');
+        }
+    });
+    </script>
     {% endif %}
 
     <div class="container main-content">
@@ -50,7 +154,7 @@
             <p>
                 &copy; 2026 Tobias Meier &middot;
                 <a href="mailto:admin(at)secutobs.com" style="color: inherit; text-decoration: none;">admin(at)secutobs.com</a> &middot;
-                Klasseneinteilung v2.0.0 &middot;
+                Klasseneinteilung v0.1.17 &middot;
                 DSGVO-konform &middot;
                 Lokale Datenspeicherung
             </p>

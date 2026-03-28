@@ -35,14 +35,18 @@
                 </td>
                 <td>{{ user.created_at }}</td>
                 <td>
-                    {% if user.id != session.user_id %}
-                    <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Benutzer wirklich l\u00f6schen?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
-                    </form>
-                    {% else %}
-                    <span class="text-muted">&mdash;</span>
-                    {% endif %}
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn btn-secondary btn-sm"
+                                onclick="openResetModal({{ user.id }}, '{{ user.username }}')">
+                            Passwort&nbsp;setzen
+                        </button>
+                        {% if user.id != session.user_id %}
+                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Benutzer wirklich l\u00f6schen?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -55,9 +59,60 @@
     <ul>
         <li>Es k&ouml;nnen maximal 10 Benutzer angelegt werden</li>
         <li>Jeder Benutzer ben&ouml;tigt einen eindeutigen Benutzernamen</li>
-        <li>Passw&ouml;rter m&uuml;ssen mindestens 6 Zeichen lang sein</li>
+        <li><strong>Passwort setzen</strong> setzt das Passwort direkt &mdash; das alte Passwort wird nicht ben&ouml;tigt</li>
         <li>Sie k&ouml;nnen sich nicht selbst l&ouml;schen</li>
-        <li>&Auml;ndern Sie das Standard-Passwort nach der ersten Anmeldung</li>
+        <li>Eigenes Passwort &auml;ndern (mit aktuellem Passwort): <a href="{{ url_for('change_password') }}">Passwort&auml;ndern-Seite</a></li>
     </ul>
 </div>
+
+<!-- ══ Passwort-Reset-Modal ══════════════════════════════════════ -->
+<div id="reset-pw-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center; padding:1rem;" onclick="closeResetModal(event)">
+    <div style="background:white; border-radius:14px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,0.25); overflow:hidden;" onclick="event.stopPropagation()">
+        <div style="background:linear-gradient(135deg,#f59e0b,#d97706); color:white; padding:1rem 1.5rem; display:flex; justify-content:space-between; align-items:center;">
+            <strong id="reset-pw-title" style="font-size:1.05rem;">Passwort zurücksetzen</strong>
+            <button onclick="closeResetModal()" style="background:none;border:none;color:white;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <div style="padding:1.5rem;">
+            <p style="margin:0 0 1rem 0; color:#555; font-size:0.9rem;">
+                Das Passwort wird direkt gesetzt &mdash; das alte Passwort wird <strong>nicht</strong> ben&ouml;tigt.
+            </p>
+            <form method="POST" id="reset-pw-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block; font-weight:600; margin-bottom:0.4rem;">Neues Passwort</label>
+                    <input type="password" name="new_password" class="form-control" required minlength="8"
+                           placeholder="Mind. 8 Zeichen, Groß-/Kleinbuchst., Zahl">
+                </div>
+                <div style="margin-bottom:1.25rem;">
+                    <label style="display:block; font-weight:600; margin-bottom:0.4rem;">Passwort bestätigen</label>
+                    <input type="password" name="new_password_confirm" class="form-control" required minlength="8">
+                </div>
+                <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeResetModal()">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Passwort setzen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openResetModal(userId, username) {
+    document.getElementById('reset-pw-title').textContent = 'Passwort setzen: ' + username;
+    document.getElementById('reset-pw-form').action = '/users/reset-password/' + userId;
+    document.getElementById('reset-pw-modal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeResetModal(event) {
+    if (event && event.target !== document.getElementById('reset-pw-modal')) return;
+    document.getElementById('reset-pw-modal').style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('reset-pw-modal').style.display = 'none';
+        document.body.style.overflow = '';
+    }
+});
+</script>
 {% endblock %}

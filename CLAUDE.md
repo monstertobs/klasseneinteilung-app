@@ -4,364 +4,218 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A **security-hardened**, DSGVO-compliant Flask web application for generating school class divisions (5th grade). Considers parent wishes, gender balance, school routes (wohnort), school type classification (schulform), religion, special needs (inclusive education), and athletic ability to produce optimized class assignments. Designed for deployment on All-Inkl shared hosting with local SQLite storage.
+A **security-hardened**, DSGVO-compliant Flask web application for generating school class divisions (5th grade). Considers parent wishes, gender balance, school routes (wohnort), school type (schulform), religion, special needs, and athletic ability. Designed for deployment on All-Inkl shared hosting with local SQLite storage.
 
-**Security Features (v2.0):**
-- ✅ CSRF Protection (Flask-WTF)
-- ✅ Brute-Force Protection (Flask-Limiter: 10 login attempts/minute)
-- ✅ Hardened Session Security (HttpOnly, SameSite, Secure cookies)
-- ✅ Strong Password Requirements (8+ chars, uppercase, lowercase, digit)
-- ✅ Custom Error Handlers (404, 500, 429)
-- ✅ Rate Limiting on all endpoints
-- ✅ Session regeneration on login
+**Current version:** 0.1.17 (8. März 2026)
+
+**Production:** Hetzner VPS, app path `/opt/klasseneinteilung/`, systemd service `klasseneinteilung`. Deploy via paramiko (password auth); `sshpass` not available on macOS.
+
+## Versioning
+
+- Schema: MAJOR.MINOR.PATCH — increment PATCH on every change, MINOR for new features
+- **Always update version + date when making any code change**, in all of:
+  - `app.py` (header comment `Version:` + `__version__`)
+  - `templates/base.html`
+  - `templates/about.html` (3 occurrences + Release Datum)
+  - `PORTABLE-WIN11-PAKET-INFO.txt` (version + date)
+  - `START-HIER.txt`
+  - `CLAUDE.md` (this file, header line above)
 
 ## Development Commands
 
 ```bash
-# Install dependencies (Python 3.10+ recommended for Werkzeug scrypt support)
+# Install dependencies (Python 3.10+ required)
 pip3 install -r requirements.txt
 
-# Run development server (http://localhost:5050)
-# WICHTIG: Initial admin password wird beim ersten Start in der Konsole angezeigt
-# Password ist zufällig generiert (16 Zeichen) - SOFORT notieren!
+# Run development server at http://localhost:5050
+# Initial admin password is randomly generated and printed ONCE to console on first run
 python3 app.py
 
-# Initialize/reset database (also runs automatically on startup)
+# Initialize/reset database (runs automatically on startup too)
 python3 -c "from app import init_db; init_db()"
 
-# Generate test data (100-150 students, 20-40 wishes)
-# Prompts for confirmation if data exists; pipe "ja" to auto-confirm
+# Generate test data (100-150 students, 20-40 wishes) — CLI version
 echo "ja" | python3 generate_testdata.py
+
+# Generate Excel test file (100 students, IB/VM/Förderbedarf/Elternwünsche)
+python3 create_testdata_excel.py  # saves testdaten_schueler_import.xlsx
+
+# Reset admin password directly in DB (when .initial_password is already deleted)
+python3 -c "
+from werkzeug.security import generate_password_hash; import sqlite3
+db = sqlite3.connect('klasseneinteilung.db')
+db.execute('UPDATE users SET password_hash=? WHERE username=?',
+           (generate_password_hash('Admin1234', method='pbkdf2:sha256'), 'admin'))
+db.commit()
+"
+
+# Deploy to production (requires: pip3 install paramiko)
+python3 - <<'EOF'
+import paramiko
+ssh = paramiko.SSHClient(); ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect('<SERVER-IP>', username='root', password='<PASS>', timeout=15)
+sftp = ssh.open_sftp()
+for f in ['app.py', 'templates/generate.html', 'templates/students.html',
+          'templates/base.html', 'templates/about.html']:
+    sftp.put(f, f'/opt/klasseneinteilung/{f}')
+sftp.close()
+ssh.exec_command('systemctl restart klasseneinteilung')
+ssh.close()
+EOF
 ```
 
-There is no test suite, linter, or build step configured.
+**Note:** Port 5000 is occupied by macOS AirPlay. App always runs on **5050**.
+
+There is no test suite, linter, or build step.
+
+## Portable WIN11 Package
+
+`klasseneinteilung-app-PORTABLE-WIN11.zip` — for restricted Windows 11 Enterprise environments (no admin rights). Setup downloads Python 3.11.8 Embedded + dependencies. Entry point: `PORTABLE-SETUP-WIN11.bat`.
+
+Rebuild after every code change:
+```bash
+rm -f klasseneinteilung-app-PORTABLE-WIN11.zip && \
+zip -r klasseneinteilung-app-PORTABLE-WIN11.zip \
+  app.py requirements.txt .env.example passenger_wsgi.py \
+  PORTABLE-SETUP-WIN11.bat PORTABLE-START.bat \
+  START-HIER.txt PORTABLE-ANLEITUNG-WIN11.txt PORTABLE-WIN11-PAKET-INFO.txt INSTALLATION-VORSCHAU.txt \
+  VERSION_HISTORY.md templates/ static/ \
+  -x "*.pyc" -x "__pycache__/*" -x "*.db" -x "flask_session/*" -x "*.zip" -x ".initial_password"
+```
+
+### Windows Batch Files — Critical Requirements
+
+All `.bat` files MUST use:
+1. **`%~dp0` for all paths** — never use `cd /d "%~dp0"` (CMD is locked on school PCs). Store as `set "APP_DIR=%~dp0"` and prefix all paths with `%APP_DIR%`
+2. **CRLF line endings** — convert with `sed 's/$/\r/' file.bat > tmp && mv tmp file.bat`
+3. **ASCII-only** — no Unicode, no emojis, no umlauts (ä→ae, ö→oe, ü→ue, ß→ss)
+
+Verify: `file filename.bat` → must show "DOS batch file text, ASCII text, with CRLF line terminators"
 
 ## Architecture
 
-Single-file Flask app (`app.py`, 2179 lines):
+Single-file Flask app (`app.py`, ~2600 lines):
 
-- **app.py** — All routes (26+ endpoints), database schema, class division algorithm, auth logic, security features, Excel/CSV/PDF export, session management (Flask-Session with filesystem backend)
-- **templates/** — 21+ Jinja2 templates extending `base.html` (includes error pages, algorithm docs, assignment viewer)
-- **static/css/style.css** — Apple-inspired responsive design with CSS custom properties
-- **static/js/script.js** — Alert auto-dismiss and delete confirmations
-- **static/js/drag-drop.js** — Drag & drop functionality for moving students between classes in preview mode
+- **app.py** — All routes, DB schema, class division algorithm, auth, security, Excel/CSV/PDF export
+- **templates/** — 23 Jinja2 templates extending `base.html`
+- **static/css/style.css** — Apple-inspired responsive design
+- **static/js/drag-drop.js** — Drag & drop for moving students between classes in preview mode
 - **passenger_wsgi.py** — WSGI entry point for All-Inkl production hosting
-- **flask_session/** — Directory for filesystem-based session storage (auto-created)
+- **flask_session/** — Filesystem session storage (auto-created; required for proposals >4KB)
 
-### Routes Overview
+### Routes
 
-**Public routes:**
-- `/` - Redirects to dashboard or login
-- `/login` - Login page (GET/POST) with rate limiting
-- `/logout` - Session termination
+**Student management:** `/students`, `/students/add`, `/students/edit/<id>`, `/students/delete/<id>`, `/students/delete_multiple`, `/students/delete_all`, `/students/import`, `/students/duplicates`, `/students/generate_testdata` (POST), `/students/delete_testdata` (POST)
 
-**Student management:**
-- `/students` - List all students with wohnort and schulform columns, bulk delete with checkboxes
-- `/students/add` - Add new student (GET/POST) with wohnort and schulform fields
-- `/students/edit/<id>` - Edit student (GET/POST) with wohnort and schulform fields
-- `/students/delete/<id>` - Delete student (POST, CSRF protected)
-- `/students/delete_multiple` - Delete selected students (POST, CSRF protected)
-- `/students/delete_all` - Delete all students with double confirmation (POST, CSRF protected)
-- `/students/import` - Import from CSV/Excel (GET/POST) with extensive column mapping
-- `/students/duplicates` - Review and manage duplicate students
-
-**Parent wishes management:**
-- `/wishes` - List all wishes
-- `/wishes/add` - Add new wish (GET/POST)
-- `/wishes/edit/<id>` - Edit wish (GET/POST)
-- `/wishes/delete/<id>` - Delete wish (POST, CSRF protected)
+**Parent wishes:** `/wishes`, `/wishes/add`, `/wishes/edit/<id>`, `/wishes/delete/<id>`
 
 **Class division:**
-- `/generate` - Generate class proposals (GET/POST) - displays classes as "5a, 5b, 5c..."
-- `/assignments` - View saved assignments
-- `/assignments/<id>` - View single saved assignment with export options
-- `/assignments/<id>/export/<format>` - Export saved assignment (excel/csv/pdf)
-- `/save_assignment` - Save selected proposal to database (POST)
-- `/export/<format>` - Export current proposal (excel/csv/pdf, POST)
-- `/algorithm` - Documentation page showing scoring system and criteria
+- `GET/POST /generate` — Generate 3 class proposals (stored in `session['last_proposals']`)
+- `GET /generate/transparency/<int:proposal_idx>` — Transparency view for a proposal
+- `GET /assignments/<id>` — View saved assignment
+- `POST /save_assignment` — Save selected proposal to DB
+- `POST /assignments/<id>/delete` — Delete a saved assignment
+- `POST /export/<format>` and `POST /assignments/<id>/export/<format>` — Excel/CSV/PDF
+- `/check_conflicts`, `/suggest_swaps` — Conflict detection for drag & drop
 
-**User management:**
-- `/users` - List users
-- `/users/add` - Add new user (GET/POST, enforces password policy)
-- `/users/delete/<id>` - Delete user (POST, CSRF protected)
+**Users (admin only):** `/users`, `/users/add`, `/users/delete/<id>` — protected by `admin_required` decorator; `/users/change-password` — for all logged-in users
 
-**Wizard & Dashboard:**
-- `/dashboard` - Main overview with statistics
-- `/wizard` - Start guided wizard
-- `/wizard/<step>` - Step-by-step wizard (5 steps)
-- `/wizard/cancel` - Cancel wizard
-- `/wizard/complete` - Complete wizard
+**Other:** `/dashboard`, `/algorithm`, `/about`, `/wizard/*`
 
 ### Database (SQLite)
 
-Four tables: `users`, `students`, `parent_wishes`, `class_assignments`. All queries use parameterized SQL (no ORM). The `class_assignments.data` column stores JSON.
+Four tables: `users`, `students`, `parent_wishes`, `class_assignments`. Parameterized SQL throughout. `class_assignments.data` stores JSON.
 
-**Student fields:**
-- Core: `firstname`, `lastname`, `gender` (m/w - divers removed), `created_by`, `created_at`
-- School route: `wohnort` (address/location for carpooling groups)
-- School type: `schulform` (H=Hauptschule, R=Realschule, G=Gymnasium, IB=Inklusiv beschulte Schüler)
-- Additional: `religion` (ethik/katholisch/evangelisch/leer), `sportlich` (0/1), `special_needs` (hoerschaedigung/sprache/sozial_emotional/lernen/leer), `notes`
-- Special class interests: `sport_interesse` (0/1), `musik_interesse` (0/1 - deprecated), `theater_interesse` (0/1 - deprecated)
-- Import tracking: `import_batch_id` (UUID for tracking imports)
+**Student fields:** `firstname`, `lastname`, `gender` (m/w), `wohnort`, `schulform` (H/R/G/IB), `religion` (ethik/katholisch/evangelisch/leer), `sportlich` (0/1), `sport_interesse` (0/1), `special_needs`, `notes`, `import_batch_id`
 
-Schema migrations use `ALTER TABLE ... ADD COLUMN` wrapped in try/except for existing columns. `init_db()` runs on every startup.
-
-### Class Division Algorithm
-
-**Core Functions:** `generate_class_assignment(students, wishes, num_classes, seed, options)` and `find_best_class(student, classes, gender_count, wohnort_count, schulform_count, religion_count, inklusion_count, wish_dict, num_classes, options)`.
-
-Creates N classes (~25 students each), generates 3 proposals with different random seeds.
-
-**Algorithm Priorities (from highest to lowest):**
-1. **Geschlechterbalance (SEHR WICHTIG):** -15 per gender ratio concentration
-2. **Stadt-Gruppierung (WICHTIG):** +20 bonus per student from same city (enables carpooling)
-3. **PLZ-Gruppierung (WICHTIG):** +10 bonus per student from same postal code
-4. **Freundewünsche (WICHTIG):** +20 together / -20 separated
-5. **Schulform-Verteilung (WICHTIG):** -8 per schulform ratio concentration
-6. **Religion (ZWEITRANGIG):** -2 per religion ratio (reduced priority)
-
-**Additional scoring weights:**
-- **Size balance:** -10 per size difference from average (always active)
-- **Hard limits:** -10000 if class full (25 students), -1000 if IB max reached
-- **Sport-Spezialklasse:** +50 for students with sport_interesse in sport class, -20 if no interest, -10 if interest but wrong class
-- **IB Min/Max:** +30 if under minimum, +10 if between min/max, -1000 if max reached (default: 2-5 per class)
-- **Religion-Bündelung:** +15 for Ethik with Konfessionen, -20 to prevent pure Ethik classes
-
-Options are passed as a dict from the generate route (GET=defaults, POST=form values):
-- `gender_balance` (default: True)
-- `schulweg_gruppe` (default: True) - groups students by city and postal code
-- `parent_wishes` (default: True)
-- `schulform_balance` (default: True) - distributes H/R/G/IB evenly
-- `religion_distribute` / `religion_group` / `religion_bundle` (mutually exclusive)
-- `sportklasse` (deprecated, backward compatibility)
-- `specialized_classes` - dict with `sport` (count), `custom` (count), `custom_name` (string)
-- `ib_min` / `ib_max` (default: 2/5) - classes have either 0 or between min-max IB students
-
-**Result formatting:**
-- Classes are displayed as "5a, 5b, 5c..." instead of "Klasse 1, 2, 3..."
-- Wohnorte are simplified to "PLZ Stadt (count)" format (e.g., "61440 Oberursel (3)")
-- City counts aggregate multiple addresses from same city
-
-### Import Functionality
-
-CSV/Excel import with extensive column mapping in `process_import_data(data, batch_id)`:
-
-**Specific column recognition for school data:**
-- **Vorname/Nachname:** Standard name fields
-- **Geschlecht:** m/w (männlich/weiblich - divers removed)
-- **SLR_WohnAdresse:** Full address → wohnort field (parsed for PLZ + Stadt)
-- **Eignung:** H/R/G values → schulform field
-- **IB / VM - s.Liste:** IB sets schulform='IB', VM stored in notes
-- **Religion / Wahlfach Religion:** Wahlfach takes precedence
-- **Sportklasse:** Ja/X/1 → sportlich=1 and sport_interesse=1
-- **Freund/ Freundin:** Automatically creates 'together' wishes (attempts name matching)
-- **Auf keine Fall mit Kind…:** Automatically creates 'separated' wishes
-- **Infos Übergabe / Sonstige / Einwände:** Combined into notes field
-
-**Generic column mapping (flexible recognition):**
-- Firstname: `vorname`, `firstname`, `first_name`, `first name`, `name`
-- Lastname: `nachname`, `lastname`, `last_name`, `last name`, `familienname`
-- Gender: `geschlecht`, `gender`, `sex` (accepts `m/w`, `männlich/weiblich`, `male/female`)
-- Wohnort: `wohnort`, `ort`, `adresse`, `address`, `schulweg`, `location`, `slr_wonadresse` (extracts PLZ + Stadt)
-- Schulform: `schulform`, `schule`, `school_type`, `bildungsgang`, `eignung`
-- Religion: `religion`, `konfession`, `wahlfach religion`
-- Sportlich: `sportlich`, `sport`, `athletic`, `sportklasse` (accepts `ja/yes/1/true/x`, sets both sportlich and sport_interesse)
-- Special needs: `förderbedarf`, `foerderbedarf`, `special_needs`, `sonderpädagogik`
-
-**Import returns:** `(imported_count, errors, duplicates, wishes_created)`
-
-Imports create a batch ID for tracking and duplicate detection based on firstname+lastname. Friend wishes use intelligent name matching (tries both "Vorname Nachname" and "Nachname Vorname" combinations).
+Schema migrations use `ALTER TABLE ... ADD COLUMN` wrapped in try/except. `init_db()` runs on every startup.
 
 ### Authentication & Security
 
-**Authentication:**
-- Session-based with bcrypt password hashing (Werkzeug PBKDF2-SHA256)
-- Flask-Session with filesystem backend (handles large session data >4KB cookie limit)
-- Sessions expire after 2 hours (configurable)
-- Max 10 users
-- **Initial admin account:** Username `admin` with randomly generated 16-character password
-  - Password is displayed ONCE in console during first startup when database is initialized
-  - Password includes uppercase, lowercase, digits, and special characters
-  - **MUST be changed immediately after first login**
-  - No hardcoded passwords (security fix from 14.02.2026)
+- Session-based, PBKDF2-SHA256 password hashing (Werkzeug)
+- `SECRET_KEY` **must** be set in `.env` — app refuses to start without it
+- Initial `admin` password: randomly generated (16 chars), printed to console **and** written to `.initial_password` on first DB init. Displayed on login page until first successful login, then deleted automatically.
+- **Admin role:** `session['is_admin']` is set to `True` when `username == 'admin'`. Use `admin_required` decorator (defined after `login_required`) for admin-only routes. Non-admin users cannot see the "Benutzer" navbar link.
+- CSRF tokens required in all forms
+- Rate limiting: 10 login attempts/minute, 200/day global
+- Every user can change their own password via `/users/change-password`
 
-**Security Features:**
-- **CSRF Protection:** Flask-WTF with tokens in all forms
-- **Rate Limiting:** Flask-Limiter (10 login attempts/minute, 200/day global)
-- **Session Security:** HttpOnly, SameSite=Lax, Secure (in production), filesystem storage for large proposals
-- **Password Policy:** Min 8 chars, requires uppercase, lowercase, digit (validated by `validate_password()`)
-- **Error Handling:** Custom 404/500/429 pages, no stack traces
-- **Input Validation:** Parameterized queries, form validation
-- **Session Management:** Regeneration on login, explicit clearing on logout
-- **UTF-8 Encoding:** Explicit charset headers, database text_factory=str, JSON_AS_ASCII=False
-- **Secrets Management:**
-  - SECRET_KEY MUST be set as environment variable (no unsafe fallback)
-  - App will not start without valid SECRET_KEY
-  - Generate with: `python3 -c 'import secrets; print(secrets.token_hex(32))'`
-  - Configure in `.env` file (see `.env.example`)
+### Class Division Algorithm
 
-**Security Audit Results (14.02.2026):**
-- Overall Rating: 🟢 **EXCELLENT** (8.5/10)
-- ✅ All critical vulnerabilities fixed
-- ✅ OWASP Top 10 (2021) compliant
-- See `SECURITY-AUDIT-REPORT.md` for full audit details
-- See `SECURITY-FIXES-2026-02-14.md` for documentation of fixes applied
+**Core functions:**
+- `generate_class_assignment(students, wishes, num_classes, seed, options)` — generates one proposal
+- `find_best_class(student, classes, ..., options, ...)` — scores each class for a student
+- `optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None)` — post-processing swaps to maximize wish fulfillment. Accepts `options` to enforce IB constraints during swaps.
+- `compute_transparency(proposal, wishes)` — enriches each student dict with `reasons` list
 
-### Template Structure
-
-All templates extend `base.html` which provides:
-- Navigation menu with active state tracking
-- Flash message display system
-- Consistent header/footer
-- Mobile-responsive layout
-
-Templates use Jinja2 syntax with German UI text. Form submissions use POST with CSRF protection via Flask-WTF.
-
-**All forms include CSRF tokens:**
-```html
-<form method="POST">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <!-- form fields -->
-</form>
+**IB student placement (pre-assignment):**
+Before the main placement loop, IB students are deterministically pre-assigned to classes in groups using round-robin. This guarantees no single IB student ends up alone:
+```python
+num_ib_classes = min(num_classes, num_ib // ib_min)
+# round-robin: student[idx] → class[idx % num_ib_classes]
 ```
+`optimize_assignment_wishes` checks `ib_move_allowed()` before any swap involving an IB student.
 
-**Key templates:**
-- `generate.html` - Displays 3 proposals as "5a, 5b, 5c..." with badges (H/R/G/IB, special needs), export dropdown, "Auswählen" button, drag & drop support
-- `view_assignment.html` - Shows saved assignment with all classes, export options
-- `algorithm.html` - Comprehensive documentation of scoring system with examples
-- `students.html` - Includes wohnort and schulform columns, bulk delete checkboxes
-- `add_student.html` / `edit_student.html` - Include wohnort input, schulform dropdown, sport_interesse checkbox
-- `import_students.html` - Excel/CSV upload interface
+**Scoring weights (highest to lowest priority):**
+1. Hard limit full class: −10000
+2. Freundewünsche: +150 together / −500 separated (bidirectional via `reverse_wish_dict`)
+3. Geschlechterbalance: −15 per gender ratio concentration
+4. Stadt-Gruppierung: +20 per student from same city
+5. PLZ-Gruppierung: +10 per student from same postal code
+6. Schulform-Verteilung: −8 per ratio concentration
+7. Religion: −2 per ratio concentration
+8. Size balance: −10 per size deviation from average
+9. IB max hard block: −1000 (normal IB placement handled by pre-assignment above)
+10. Sport-Spezialklasse: +50 / −20 depending on sport_interesse
+
+**Smart initial ordering:** Students most-wished-for by others are placed first. IB students are extracted and pre-assigned before this ordering runs.
+
+**`options` dict keys:** `gender_balance`, `schulweg_gruppe`, `parent_wishes`, `schulform_balance`, `religion_distribute`/`religion_group`/`religion_bundle`, `specialized_classes`, `ib_min`/`ib_max`, `sportklasse` (deprecated)
+
+### Import Functionality
+
+`process_import_data(data, batch_id)` handles CSV/Excel with extensive column mapping.
+
+**School-specific columns:** `SLR_WohnAdresse` → wohnort, `Eignung` → schulform, `IB / VM - s.Liste` → schulform='IB' (if contains "IB") or appended to notes as "VM: …" (if contains "VM"), `Wahlfach Religion` → religion, `Sportklasse` → sportlich+sport_interesse, `Freund/Freundin` → 'together' wishes, `Auf keine Fall mit Kind…` → 'separated' wishes
+
+**Important:** `parent_wishes` INSERT uses column `description` (not `notes`). The table has no `created_by` column.
+
+### Testdata Generator (Web UI)
+
+`POST /students/generate_testdata` — generates fictional students directly into the DB. Form params: `anzahl` (10–300), `with_ib`, `with_vm`, `with_foerder`, `with_wishes` (all checkboxes, value `"1"`). Students are tagged with `import_batch_id = "TESTDATA-<timestamp>"` so they are visually marked as "Importiert" and can be bulk-deleted via `POST /students/delete_testdata`.
+
+The `🧪 Testdaten` button and modal live in `templates/students.html`. VM students get `notes = "VM: Vorbeugende Maßnahme"` (not a special DB field).
+
+### Proposal Comparison (generate route)
+
+After generating 3 proposals, the `generate` route computes per-proposal metrics and stores them in `proposal['statistics']`:
+- `wish_rate` (int 0–100 or None), `wish_fulfilled`, `wish_total`
+- `gender_balance_score` (int 0–100, stddev-based)
+- `student_class_map` (dict `{student_id: class_number}`) — used by JS in `generate.html` to compute cross-proposal student differences
+
+`generate.html` renders a comparison panel above the proposals (`.comparison-panel`) and marks students that differ across proposals with CSS class `.student-differs` (yellow highlight + `↕` indicator).
+
+### Key Templates
+
+- `generate.html` — 3 proposals with drag & drop, comparison panel, per-proposal wish rate badge, student diff highlighting, Transparenz + Export buttons
+- `transparency.html` — Color-coded reason badges; JS class-filter tabs + text search
+- `change_password.html` — Password change form with show/hide toggle (eye button) per field
+- `students.html` — Testdaten modal (inline `<style>` + `<script>`, no external files)
+
+### CSS Badge Classes (`static/css/style.css`)
+
+`.badge-success`, `.badge-danger`, `.badge-info`, `.badge-warning`, `.badge-dark`, `.badge-secondary`
 
 ## Configuration
 
-Environment variables from `.env` (see `.env.example`):
-- `SECRET_KEY` — **Required!** Use `secrets.token_hex(32)` to generate
-- `FLASK_ENV` — Set to `production` for HTTPS-only cookies
-- `FLASK_DEBUG` — Set to `false` in production
-- `DATABASE_PATH` — Path to SQLite database (default: `klasseneinteilung.db`)
-- `SESSION_LIFETIME` — Session timeout in hours (default: 2)
-- `MAX_USERS` — Maximum user accounts (default: 10)
-- `MAX_STUDENTS` — Maximum students (default: unlimited)
-
-## Deployment Packages
-
-Three Windows deployment options available:
-
-**klasseneinteilung-app-WINDOWS.zip** - Standard installation with virtualenv
-- Requires Python 3.10+ installed
-- Uses `INSTALLATION.bat` for one-time setup
-- Uses `START.bat` to launch
-- Creates desktop shortcut automatically
-
-**klasseneinteilung-app-PORTABLE.zip** - Basic portable version
-- No Python installation required
-- Downloads Python 3.11.8 Embedded automatically
-- Uses `PORTABLE-SETUP.bat` for one-time setup
-- Uses `PORTABLE-START.bat` to launch
-- Can run from USB stick
-
-**klasseneinteilung-app-PORTABLE-WIN11.zip** - Enhanced portable version (RECOMMENDED for Enterprise)
-- **Simplified installation** - Linear STEP 1/5 to 5/5 progress display
-- **Completely automatic** - no user input required
-- **No admin rights** needed - perfect for restricted Windows 11 Enterprise PCs
-- **Automatic browser launch** after installation
-- **Desktop shortcut** created automatically
-- Uses `PORTABLE-SETUP-WIN11.bat` for one-time setup (simplified, ~80 lines)
-- Uses `PORTABLE-START.bat` to launch (~60 lines, ASCII-only)
-- Includes comprehensive documentation:
-  * `START-HIER.txt` - Quick start guide (first file users see)
-  * `PORTABLE-ANLEITUNG-WIN11.txt` - Complete user manual
-  * `INSTALLATION-VORSCHAU.txt` - Shows what installation looks like
-  * `PORTABLE-WIN11-PAKET-INFO.txt` - Technical package details
-- Can run from USB stick or network drive
-- No system changes, fully portable
-- Installation time: 2-3 minutes (one-time), Future starts: 5 seconds
-- Downloads during setup: ~27 MB (Python 3.11.8 Embedded + dependencies)
-- **File size:** ~63 KB (all batch files use CRLF + ASCII only)
-
-All packages include all security features and full documentation.
+`.env` variables: `SECRET_KEY` (required), `FLASK_ENV`, `FLASK_DEBUG`, `DATABASE_PATH` (default: `klasseneinteilung.db`), `SESSION_LIFETIME` (default: 2h), `MAX_USERS` (default: 10), `MAX_STUDENTS`
 
 ## Language
 
-All UI text and documentation is in German. Python identifiers and database columns are in English.
+All UI text is German. Python identifiers and DB columns are English.
 
-## All-Inkl Deployment
+## Export Formats
 
-The app is configured for Passenger WSGI deployment on All-Inkl shared hosting. Key files:
-- `passenger_wsgi.py` - WSGI entry point (requires path customization)
-- `.htaccess` - Passenger configuration (requires path customization)
-- `.env` - Production environment variables with generated SECRET_KEY
-
-Both `passenger_wsgi.py` and `.htaccess` contain placeholder paths that must be replaced with actual server paths before deployment.
-
-## Windows Batch Files - Critical Requirements
-
-**IMPORTANT:** All `.bat` files MUST have:
-1. **Windows line endings (CRLF)** - Use `sed 's/$/\r/'` to convert from Unix LF
-2. **ASCII-only characters** - No Unicode (╔═╗║█░), no emojis (❌✓ℹ️), no special chars
-3. **No German umlauts** in code - Replace: ä→ae, ö→oe, ü→ue, ß→ss
-4. **Simple PowerShell commands** - Avoid nested quotes, use direct Invoke-WebRequest
-5. **Test with:** `file filename.bat` should show "DOS batch file text, ASCII text, with CRLF line terminators"
-
-**Affected files:**
-- `PORTABLE-SETUP-WIN11.bat` - Installation script
-- `PORTABLE-START.bat` - Portable startup script
-- `START.bat` - Standard startup script
-- `INSTALLATION.bat` - Standard installation script
-
-**Common error:** Files created on macOS/Linux default to LF endings and may contain UTF-8 encoded umlauts. Windows CMD cannot parse these correctly and shows errors like "Der Befehl 'n!' ist entweder falsch geschrieben...".
-
-**Fix template:**
-```bash
-# Create file, then convert to Windows format
-cat > filename.bat << 'EOF'
-@echo off
-chcp 65001 >nul 2>&1
-echo Text without umlauts (ue instead of ü)
-EOF
-sed 's/$/\r/' filename.bat > filename-temp.bat
-mv filename-temp.bat filename.bat
-```
-
-## Export Functionality
-
-Three export formats available (Excel, CSV, PDF):
-
-**PDF Export:**
-- Uses ReportLab with Helvetica font
-- Text normalization for special characters (č→c, ä→ae) to avoid encoding issues
-- Columns: Nachname, Vorname, Geschlecht, Schulform, IB (only shows "Ja" for IB students)
-- One page per class with statistics
-
-**Excel Export (.xlsx):**
-- Uses openpyxl
-- Full UTF-8 support (preserves umlauts)
-- Columns: Nachname, Vorname, Geschlecht, Schulform, IB, Wohnort
-- One sheet per class with color-coded headers
-
-**CSV Export:**
-- Semicolon-delimited (;)
-- UTF-8 encoding
-- Columns: Klasse, Nachname, Vorname, Geschlecht, Schulform, IB, Wohnort, Religion
-- All classes in one file
-
-## Important Notes
-
-- **Python Version:** 3.10+ recommended (Werkzeug 3.0.1 requires scrypt support)
-- **Flask-Session Version:** 0.8.0+ required (0.5.0 has compatibility issues with Werkzeug 3.0.1)
-- **SECRET_KEY:** MUST be set in `.env` file - app will not start without it (use `python3 -c 'import secrets; print(secrets.token_hex(32))'` to generate)
-- **Initial Admin Password:** Randomly generated on first startup (16 chars) - displayed ONCE in console, must be changed after first login
-- **Security Audit:** App rated 8.5/10 (EXCELLENT) - all critical issues fixed (see `SECURITY-AUDIT-REPORT.md`)
-- **DSGVO Compliance:** App is designed for German schools following HDSG and HSchG § 83
-- **Algorithm Priorities:** Gender balance is most important, followed by city/PLZ grouping, friend wishes, schulform distribution, and religion (secondary)
-- **Class Naming:** Classes are displayed as "5a, 5b, 5c..." for 5th grade (hardcoded)
-- **Wohnort Processing:** Addresses are parsed with regex to extract "PLZ Stadt" (e.g., "61440 Oberursel"), grouped by city with counts
-- **IB Distribution:** Default 2-5 per class (either 0 or between min-max to avoid single IB students)
-- **Gender Options:** Only m/w (divers was removed)
-- **Special Classes:** Sport classes via dropdown (0-10), custom class with free text name
-- **Drag & Drop:** Preview mode only, changes not automatically saved (requires "Auswählen" button)
-- **Session Storage:** Filesystem-based (flask_session/ directory) to handle large proposals (3 proposals × ~6KB each)
-- **UTF-8 Handling:** Response headers set to UTF-8, database uses text_factory=str, JSON_AS_ASCII=False
-- **Enterprise Deployment:** Use `klasseneinteilung-app-PORTABLE-WIN11.zip` for restricted Windows 11 environments
-- **Batch Files:** Always use ASCII + CRLF when editing .bat files (see section above)
+- **Excel:** openpyxl, one sheet per class, color-coded headers
+- **CSV:** semicolon-delimited, UTF-8, all classes in one file
+- **PDF:** ReportLab/Helvetica, text normalization for special chars (ä→ae etc.)

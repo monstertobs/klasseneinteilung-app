@@ -16,18 +16,18 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th>Nr.</th>
+                <th class="hide-mobile">Nr.</th>
                 <th>Sch&uuml;ler</th>
                 <th>Wunsch-Typ</th>
                 <th>Bezugsperson</th>
-                <th>Beschreibung</th>
+                <th class="hide-mobile">Beschreibung</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
         <tbody>
             {% for wish in wishes %}
             <tr>
-                <td>{{ loop.index }}</td>
+                <td class="hide-mobile">{{ loop.index }}</td>
                 <td><strong>{{ wish.student_name }}</strong></td>
                 <td>
                     {% if wish.wish_type == 'together' %}
@@ -39,7 +39,7 @@
                     {% endif %}
                 </td>
                 <td>{{ wish.related_student_name or '—' }}</td>
-                <td>{{ wish.description or '—' }}</td>
+                <td class="hide-mobile">{{ wish.description or '—' }}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">
                         <a href="{{ url_for('edit_wish', wish_id=wish.id) }}" class="btn btn-secondary btn-sm">Bearbeiten</a>

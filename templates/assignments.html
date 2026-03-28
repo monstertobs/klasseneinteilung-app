@@ -8,6 +8,7 @@
         <h2>Gespeicherte Einteilungen</h2>
         <p>{{ assignments|length }} Einteilungen gespeichert</p>
     </div>
+    <button id="compare-btn" class="btn btn-secondary" style="display:none;" onclick="compareSelected()">Vergleichen</button>
 </div>
 
 {% if assignments %}
@@ -15,28 +16,37 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th>Nr.</th>
+                <th style="width:40px;"></th>
+                <th class="hide-mobile">Nr.</th>
                 <th>Name</th>
-                <th>Erstellt von</th>
-                <th>Erstellt am</th>
+                <th class="hide-mobile">Erstellt von</th>
+                <th class="hide-mobile">Erstellt am</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
         <tbody>
             {% for assignment in assignments %}
             <tr>
-                <td>{{ loop.index }}</td>
-                <td><strong>{{ assignment.name }}</strong></td>
-                <td>{{ assignment.username }}</td>
-                <td>{{ assignment.created_at }}</td>
                 <td>
+                    <input type="checkbox" class="compare-checkbox" data-id="{{ assignment.id }}" onchange="updateCompareBtn()">
+                </td>
+                <td class="hide-mobile">{{ loop.index }}</td>
+                <td><strong>{{ assignment.name }}</strong></td>
+                <td class="hide-mobile">{{ assignment.username }}</td>
+                <td class="hide-mobile">{{ assignment.created_at }}</td>
+                <td style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <a href="{{ url_for('view_assignment', assignment_id=assignment.id) }}" class="btn btn-primary btn-sm">Ansehen</a>
+                    <form method="POST" action="{{ url_for('delete_assignment', assignment_id=assignment.id) }}" style="display:inline;" onsubmit="return confirm('Einteilung wirklich löschen?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+<p style="color:#86868b; font-size:0.85rem; margin-top:0.75rem;">Zwei Einteilungen ankreuzen um sie zu vergleichen.</p>
 {% else %}
 <div class="empty-state">
     <h3>Noch keine Einteilungen gespeichert</h3>
@@ -44,4 +54,28 @@
     <a href="{{ url_for('generate') }}" class="btn btn-primary">Einteilung generieren</a>
 </div>
 {% endif %}
+
+<script>
+function updateCompareBtn() {
+    var checked = document.querySelectorAll('.compare-checkbox:checked');
+    var btn = document.getElementById('compare-btn');
+    if (checked.length === 2) {
+        btn.style.display = 'inline-flex';
+        btn.textContent = 'Vergleichen';
+    } else if (checked.length > 2) {
+        btn.style.display = 'inline-flex';
+        btn.textContent = 'Nur 2 auswählen';
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+function compareSelected() {
+    var checked = document.querySelectorAll('.compare-checkbox:checked');
+    if (checked.length !== 2) return;
+    var a = checked[0].dataset.id;
+    var b = checked[1].dataset.id;
+    window.location.href = '/assignments/compare?a=' + a + '&b=' + b;
+}
+</script>
 {% endblock %}

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Vergleich — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Einteilungen vergleichen</h2>
+        <p>{{ total_count }} Sch&uuml;ler &middot; {{ changed_count }} ge&auml;ndert</p>
+    </div>
+    <a href="{{ url_for('assignments') }}" class="btn btn-secondary">Zur&uuml;ck</a>
+</div>
+
+<!-- Header der beiden Einteilungen -->
+<div class="compare-header">
+    <div class="compare-col-a">
+        <div class="compare-label">Einteilung A</div>
+        <div class="compare-name">{{ assignment_a.name }}</div>
+        <div class="compare-meta">{{ assignment_a.created_at[:16] }} &middot; {{ assignment_a.username }}</div>
+    </div>
+    <div class="compare-col-b">
+        <div class="compare-label">Einteilung B</div>
+        <div class="compare-name">{{ assignment_b.name }}</div>
+        <div class="compare-meta">{{ assignment_b.created_at[:16] }} &middot; {{ assignment_b.username }}</div>
+    </div>
+</div>
+
+<!-- Zusammenfassung -->
+<div class="compare-summary">
+    <div class="compare-stat">
+        <span class="compare-stat-num">{{ total_count }}</span>
+        <span class="compare-stat-label">Sch&uuml;ler gesamt</span>
+    </div>
+    <div class="compare-stat compare-stat-changed">
+        <span class="compare-stat-num">{{ changed_count }}</span>
+        <span class="compare-stat-label">Ge&auml;ndert</span>
+    </div>
+    <div class="compare-stat compare-stat-ok">
+        <span class="compare-stat-num">{{ total_count - changed_count }}</span>
+        <span class="compare-stat-label">Unver&auml;ndert</span>
+    </div>
+</div>
+
+<!-- Filter -->
+<div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+    <button class="btn btn-secondary btn-sm" id="btn-all" onclick="filterRows('all')">Alle anzeigen</button>
+    <button class="btn btn-primary btn-sm" id="btn-changed" onclick="filterRows('changed')">Nur Ge&auml;nderte ({{ changed_count }})</button>
+</div>
+
+<!-- Vergleichs-Tabelle -->
+<div class="table-container">
+    <table class="data-table" id="compare-table">
+        <thead>
+            <tr>
+                <th>Sch&uuml;ler</th>
+                <th>Klasse A</th>
+                <th>Klasse B</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr class="compare-row {% if row.changed %}row-changed{% else %}row-same{% endif %}">
+                <td><strong>{{ row.name }}</strong></td>
+                <td>
+                    {% if row.only_in_b %}
+                        <span style="color:#aaa;">—</span>
+                    {% else %}
+                        <span class="class-badge {% if row.changed %}class-badge-old{% endif %}">{{ row.a_class }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row.only_in_a %}
+                        <span style="color:#aaa;">—</span>
+                    {% else %}
+                        <span class="class-badge {% if row.changed %}class-badge-new{% endif %}">{{ row.b_class }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row.only_in_a %}
+                        <span class="badge badge-secondary">Nur in A</span>
+                    {% elif row.only_in_b %}
+                        <span class="badge badge-secondary">Nur in B</span>
+                    {% elif row.changed %}
+                        <span class="badge badge-warning">Verschoben</span>
+                    {% else %}
+                        <span class="badge badge-success">Unver&auml;ndert</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.compare-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.compare-col-a, .compare-col-b {
+    padding: 1.25rem 1.5rem;
+    border-radius: 12px;
+}
+.compare-col-a { background: #eff6ff; border-left: 4px solid #3b82f6; }
+.compare-col-b { background: #f0fdf4; border-left: 4px solid #22c55e; }
+.compare-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #86868b; margin-bottom: 0.25rem; }
+.compare-name { font-weight: 600; font-size: 1rem; color: #1d1d1f; }
+.compare-meta { font-size: 0.8rem; color: #86868b; margin-top: 0.2rem; }
+
+.compare-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.compare-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: #f1f5f9;
+    border-radius: 10px;
+    min-width: 90px;
+    text-align: center;
+}
+.compare-stat-changed { background: #fff3cd; }
+.compare-stat-ok { background: #dcfce7; }
+.compare-stat-num { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+.compare-stat-label { font-size: 0.75rem; font-weight: 500; margin-top: 0.25rem; color: #555; }
+
+.row-changed { background: #fffbeb !important; }
+.row-changed:hover { background: #fef3c7 !important; }
+
+.class-badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background: #e2e8f0;
+    color: #1e293b;
+}
+.class-badge-old { background: #fee2e2; color: #b91c1c; }
+.class-badge-new { background: #dcfce7; color: #15803d; }
+
+@media (max-width: 768px) {
+    .compare-header { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+function filterRows(mode) {
+    var rows = document.querySelectorAll('.compare-row');
+    rows.forEach(function(row) {
+        if (mode === 'all') {
+            row.style.display = '';
+        } else {
+            row.style.display = row.classList.contains('row-changed') ? '' : 'none';
+        }
+    });
+    document.getElementById('btn-all').className = mode === 'all' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+    document.getElementById('btn-changed').className = mode === 'changed' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+}
+</script>
+{% endblock %}

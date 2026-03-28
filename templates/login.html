@@ -25,11 +25,13 @@
             <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
         </form>
 
+        {% if initial_password %}
         <div class="login-info">
             <p><strong>Erstanmeldung:</strong></p>
-            <p>Benutzer: <code>admin</code> &middot; Passwort: <code>admin123</code></p>
+            <p>Benutzer: <code>admin</code> &middot; Passwort: <code>{{ initial_password }}</code></p>
             <p class="text-small">Bitte &auml;ndern Sie das Passwort nach der ersten Anmeldung.</p>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

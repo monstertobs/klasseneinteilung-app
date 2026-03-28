@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 2.0.0
+Version: 0.1.17
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: February 13, 2026
+Date: 26. Februar 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '2.0.0'
+__version__ = '0.1.17'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -107,6 +107,25 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+IDLE_TIMEOUT_MINUTES = 15  # Automatischer Logout nach X Minuten Inaktivität
+
+@app.before_request
+def check_idle_timeout():
+    """Automatischer Logout nach IDLE_TIMEOUT_MINUTES Minuten Inaktivität"""
+    if 'user_id' not in session:
+        return
+    if request.endpoint in ('static', 'login', 'logout'):
+        return
+    last_activity = session.get('last_activity')
+    now = datetime.now()
+    if last_activity:
+        idle_seconds = (now - datetime.fromisoformat(last_activity)).total_seconds()
+        if idle_seconds > IDLE_TIMEOUT_MINUTES * 60:
+            session.clear()
+            flash('Sie wurden wegen Inaktivität automatisch abgemeldet.', 'warning')
+            return redirect(url_for('login'))
+    session['last_activity'] = now.isoformat()
+
 # Response-Header für UTF-8 Encoding setzen
 @app.after_request
 def after_request(response):
@@ -169,7 +188,8 @@ def init_db():
         ('schulform', 'TEXT DEFAULT ""'),
         ('sport_interesse', 'INTEGER DEFAULT 0'),
         ('musik_interesse', 'INTEGER DEFAULT 0'),
-        ('theater_interesse', 'INTEGER DEFAULT 0')
+        ('theater_interesse', 'INTEGER DEFAULT 0'),
+        ('ikl', 'INTEGER DEFAULT 0'),
     ]:
         try:
             cursor.execute(f'ALTER TABLE students ADD COLUMN {col} {coldef}')
@@ -225,6 +245,10 @@ def init_db():
             print("BITTE SOFORT NACH DEM ERSTEN LOGIN ÄNDERN!")
             print("Das Passwort wird nicht erneut angezeigt und ist nicht wiederherstellbar.")
             print("="*70 + "\n")
+
+            # Passwort in temporärer Datei speichern für Anzeige auf Login-Seite
+            with open('.initial_password', 'w') as f:
+                f.write(initial_password)
         except Exception as e:
             # Skip admin user creation if error (user should already exist in DB)
             print(f"Warning: Could not create admin user: {e}")
@@ -240,6 +264,19 @@ def login_required(f):
         if 'user_id' not in session:
             flash('Bitte melden Sie sich an.', 'warning')
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Decorator für Admin-Pflicht"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Bitte melden Sie sich an.', 'warning')
+            return redirect(url_for('login'))
+        if not session.get('is_admin'):
+            flash('Zugriff verweigert. Nur Administratoren haben Zugang zu dieser Seite.', 'danger')
+            return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -285,7 +322,7 @@ def version():
         'email': __email__,
         'copyright': __copyright__,
         'license': __license__,
-        'release_date': 'February 13, 2026'
+        'release_date': 'February 21, 2026'
     })
 
 @app.route('/about')
@@ -321,14 +358,23 @@ def login():
             session.clear()  # Alte Session-Daten löschen
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['is_admin'] = (user['username'] == 'admin')
             session.permanent = True
             session.modified = True
+            # Temporäre Passwort-Datei nach erstem Login löschen
+            if os.path.exists('.initial_password'):
+                os.remove('.initial_password')
             flash('Erfolgreich angemeldet!', 'success')
             return redirect(url_for('dashboard'))
         else:
             flash('Ungültiger Benutzername oder Passwort.', 'danger')
 
-    return render_template('login.html')
+    initial_password = None
+    if os.path.exists('.initial_password'):
+        with open('.initial_password', 'r') as f:
+            initial_password = f.read().strip()
+
+    return render_template('login.html', initial_password=initial_password)
 
 @app.route('/logout')
 def logout():
@@ -341,18 +387,74 @@ def logout():
 @login_required
 def dashboard():
     """Haupt-Dashboard"""
+    import json as _json
     db = get_db()
     cursor = db.cursor()
 
-    # Statistiken abrufen
+    # Schüler-Statistiken
     cursor.execute('SELECT COUNT(*) as count FROM students')
     student_count = cursor.fetchone()['count']
 
+    cursor.execute("SELECT COUNT(*) as count FROM students WHERE gender='m'")
+    student_m = cursor.fetchone()['count']
+
+    cursor.execute("SELECT COUNT(*) as count FROM students WHERE gender='w'")
+    student_w = cursor.fetchone()['count']
+
+    cursor.execute("SELECT COUNT(*) as count FROM students WHERE schulform='IB'")
+    student_ib = cursor.fetchone()['count']
+
+    cursor.execute("SELECT COUNT(*) as count FROM students WHERE ikl=1")
+    student_ikl = cursor.fetchone()['count']
+
+    # Wunsch-Statistiken
     cursor.execute('SELECT COUNT(*) as count FROM parent_wishes')
     wish_count = cursor.fetchone()['count']
 
+    cursor.execute("SELECT COUNT(*) as count FROM parent_wishes WHERE wish_type='together'")
+    wish_together = cursor.fetchone()['count']
+
+    cursor.execute("SELECT COUNT(*) as count FROM parent_wishes WHERE wish_type='separated'")
+    wish_separated = cursor.fetchone()['count']
+
+    # Einteilungen
     cursor.execute('SELECT COUNT(*) as count FROM class_assignments')
     assignment_count = cursor.fetchone()['count']
+
+    # Wunsch-Erfüllungsrate aus neuester Einteilung berechnen
+    wish_rate = None
+    wish_fulfilled = 0
+    wish_total = 0
+    latest_assignment_name = None
+
+    cursor.execute('SELECT name, data FROM class_assignments ORDER BY created_at DESC LIMIT 1')
+    latest = cursor.fetchone()
+    if latest and wish_count > 0:
+        latest_assignment_name = latest['name']
+        try:
+            proposal = _json.loads(latest['data'])
+            student_class = {}
+            for cls in proposal.get('classes', []):
+                for s in cls.get('students', []):
+                    student_class[s['id']] = cls['name']
+
+            cursor.execute('SELECT student_id, related_student_id, wish_type FROM parent_wishes')
+            wishes = cursor.fetchall()
+            for w in wishes:
+                if w['related_student_id'] not in student_class:
+                    continue
+                wish_total += 1
+                s_cls = student_class.get(w['student_id'])
+                r_cls = student_class.get(w['related_student_id'])
+                if s_cls and r_cls:
+                    if w['wish_type'] == 'together' and s_cls == r_cls:
+                        wish_fulfilled += 1
+                    elif w['wish_type'] == 'separated' and s_cls != r_cls:
+                        wish_fulfilled += 1
+            if wish_total > 0:
+                wish_rate = round(wish_fulfilled / wish_total * 100)
+        except Exception:
+            pass
 
     db.close()
 
@@ -362,8 +464,18 @@ def dashboard():
 
     return render_template('dashboard.html',
                          student_count=student_count,
+                         student_m=student_m,
+                         student_w=student_w,
+                         student_ib=student_ib,
+                         student_ikl=student_ikl,
                          wish_count=wish_count,
+                         wish_together=wish_together,
+                         wish_separated=wish_separated,
                          assignment_count=assignment_count,
+                         wish_rate=wish_rate,
+                         wish_fulfilled=wish_fulfilled,
+                         wish_total=wish_total,
+                         latest_assignment_name=latest_assignment_name,
                          wizard_active=wizard_active,
                          wizard_step=wizard_step,
                          version=__version__,
@@ -395,6 +507,7 @@ def add_student():
         sportlich = 1 if 'sportlich' in request.form else 0
         sport_interesse = 1 if 'sport_interesse' in request.form else 0
         special_needs = request.form.get('special_needs', '').strip()
+        ikl = 1 if 'ikl' in request.form else 0
         notes = request.form.get('notes', '').strip()
 
         if firstname and lastname:
@@ -402,10 +515,10 @@ def add_student():
             cursor = db.cursor()
             cursor.execute('''
                 INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
-                                     sport_interesse, musik_interesse, theater_interesse, special_needs, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     sport_interesse, musik_interesse, theater_interesse, special_needs, ikl, notes, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
-                  sport_interesse, 0, 0, special_needs, notes, session['user_id']))
+                  sport_interesse, 0, 0, special_needs, ikl, notes, session['user_id']))
             db.commit()
             db.close()
 
@@ -433,6 +546,7 @@ def edit_student(student_id):
         sportlich = 1 if 'sportlich' in request.form else 0
         sport_interesse = 1 if 'sport_interesse' in request.form else 0
         special_needs = request.form.get('special_needs', '').strip()
+        ikl = 1 if 'ikl' in request.form else 0
         notes = request.form.get('notes', '').strip()
 
         if firstname and lastname:
@@ -440,10 +554,10 @@ def edit_student(student_id):
                 UPDATE students
                 SET firstname = ?, lastname = ?, gender = ?, wohnort = ?, schulform = ?, religion = ?,
                     sportlich = ?, sport_interesse = ?, musik_interesse = ?, theater_interesse = ?,
-                    special_needs = ?, notes = ?
+                    special_needs = ?, ikl = ?, notes = ?
                 WHERE id = ?
             ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
-                  sport_interesse, 0, 0, special_needs, notes, student_id))
+                  sport_interesse, 0, 0, special_needs, ikl, notes, student_id))
             db.commit()
             db.close()
 
@@ -530,25 +644,28 @@ def import_students():
                 flash('Ungültiges Dateiformat. Bitte verwenden Sie CSV oder Excel (.xlsx).', 'danger')
                 return redirect(request.url)
 
-            # Erfolgsmeldung
-            if imported_count > 0:
-                flash(f'{imported_count} Schüler erfolgreich importiert!', 'success')
-
-            if wishes_created > 0:
-                flash(f'{wishes_created} Freundewünsche automatisch importiert!', 'success')
-
-            if errors:
-                flash(f'{len(errors)} Fehler beim Import: ' + ', '.join(errors[:5]), 'warning')
-
-            if duplicates:
-                flash(f'⚠️ {len(duplicates)} mögliche Duplikate gefunden! Bitte überprüfen Sie die Liste.', 'warning')
-
             # Zu Duplikats-Seite weiterleiten, wenn Duplikate gefunden wurden
             if duplicates:
                 session['last_import_batch'] = batch_id
+                if imported_count > 0:
+                    flash(f'{imported_count} Schüler importiert.', 'success')
+                if wishes_created > 0:
+                    flash(f'{wishes_created} Freundewünsche importiert.', 'success')
+                if errors:
+                    session['import_errors'] = errors
+                flash(f'{len(duplicates)} mögliche Duplikate gefunden — bitte prüfen.', 'warning')
                 return redirect(url_for('check_duplicates'))
 
-            return redirect(url_for('students'))
+            # Ergebnis-Ansicht rendern (kein Redirect)
+            import_results = {
+                'filename': filename,
+                'imported_count': imported_count,
+                'errors': errors,
+                'wishes_created': wishes_created,
+            }
+            return render_template('import_students.html',
+                                   excel_support=EXCEL_SUPPORT,
+                                   import_results=import_results)
 
         except Exception as e:
             flash(f'Fehler beim Import: {str(e)}', 'danger')
@@ -598,6 +715,7 @@ def process_import_data(data, batch_id):
             notes_parts = []  # Für mehrere Notizen-Felder
             freund_value = None
             keinen_fall_value = None
+            row_warnings = []  # Warnungen für diese Zeile (Schüler wird trotzdem importiert)
 
             # Standard-Felder mappen
             for db_field, possible_names in field_mappings.items():
@@ -614,7 +732,12 @@ def process_import_data(data, batch_id):
                             gender_map = {'m': 'm', 'männlich': 'm', 'male': 'm',
                                          'w': 'w', 'weiblich': 'w', 'female': 'w',
                                          'd': 'd', 'divers': 'd', 'diverse': 'd'}
-                            student_data['gender'] = gender_map.get(str(value).lower().strip(), '')
+                            mapped = gender_map.get(str(value).lower().strip())
+                            if mapped:
+                                student_data['gender'] = mapped
+                            else:
+                                student_data['gender'] = ''
+                                row_warnings.append(f'Geschlecht "{str(value).strip()}" nicht erkannt — erwartet: m / w / d')
                         elif db_field == 'wohnort':
                             student_data['wohnort'] = str(value).strip()
                         elif db_field == 'schulform':
@@ -622,14 +745,35 @@ def process_import_data(data, batch_id):
                                            'r': 'R', 'realschule': 'R', 'rs': 'R',
                                            'g': 'G', 'gymnasium': 'G', 'gym': 'G',
                                            'ib': 'IB', 'inklusiv': 'IB', 'inklusion': 'IB'}
-                            student_data['schulform'] = schulform_map.get(str(value).lower().strip(), str(value).strip())
+                            mapped = schulform_map.get(str(value).lower().strip())
+                            if mapped:
+                                student_data['schulform'] = mapped
+                            else:
+                                student_data['schulform'] = str(value).strip()
+                                row_warnings.append(f'Schulform "{str(value).strip()}" nicht erkannt — erwartet: H / R / G / IB')
                         elif db_field == 'religion':
+                            rel_val = str(value).strip().lower()
+                            known_religions = {'ethik', 'katholisch', 'evangelisch', 'leer'}
                             student_data['religion'] = str(value).strip()
+                            if rel_val not in known_religions:
+                                row_warnings.append(f'Religion "{str(value).strip()}" nicht erkannt — erwartet: ethik / katholisch / evangelisch')
                         elif db_field == 'sportlich':
                             sportlich_values = ['ja', 'yes', '1', 'true', 'x']
-                            student_data['sportlich'] = 1 if str(value).lower().strip() in sportlich_values else 0
+                            nein_values = ['nein', 'no', '0', 'false', '-', '']
+                            val_low = str(value).lower().strip()
+                            if val_low in sportlich_values:
+                                student_data['sportlich'] = 1
+                            elif val_low in nein_values:
+                                student_data['sportlich'] = 0
+                            else:
+                                student_data['sportlich'] = 0
+                                row_warnings.append(f'Sportlich "{str(value).strip()}" nicht erkannt — erwartet: ja / nein')
                         elif db_field == 'special_needs':
+                            sn_val = str(value).strip().lower()
+                            known_sn = {'hoerschaedigung', 'sprache', 'sozial_emotional', 'lernen', 'sehen', 'kme'}
                             student_data['special_needs'] = str(value).strip()
+                            if sn_val not in known_sn:
+                                row_warnings.append(f'Förderbedarf "{str(value).strip()}" nicht erkannt — erwartet: hoerschaedigung / sprache / sozial_emotional / lernen / sehen / kme')
                         elif db_field == 'notes':
                             # Alle Notizen sammeln
                             notes_parts.append(f"{possible_name.title()}: {str(value).strip()}")
@@ -662,7 +806,8 @@ def process_import_data(data, batch_id):
 
             # Pflichtfelder prüfen
             if not firstname or not lastname:
-                errors.append(f'Zeile {idx}: Vorname oder Nachname fehlt')
+                partial = f"{firstname or ''} {lastname or ''}".strip() or '—'
+                errors.append({'row': idx, 'name': partial, 'type': 'error', 'reason': 'Vorname oder Nachname fehlt'})
                 continue
 
             # Duplikats-Check (gleicher Vor- und Nachname)
@@ -701,6 +846,10 @@ def process_import_data(data, batch_id):
             student_id = cursor.lastrowid
             imported_count += 1
 
+            # Feld-Warnungen für diese Zeile hinzufügen
+            for w in row_warnings:
+                errors.append({'row': idx, 'name': f'{firstname} {lastname}', 'type': 'warning', 'reason': w})
+
             # Freundewünsche für späteren Import speichern
             if freund_value:
                 wish_data.append({
@@ -718,7 +867,8 @@ def process_import_data(data, batch_id):
                 })
 
         except Exception as e:
-            errors.append(f'Zeile {idx}: {str(e)}')
+            name = f"{firstname or ''} {lastname or ''}".strip() or '—'
+            errors.append({'row': idx, 'name': name, 'type': 'error', 'reason': str(e)})
 
     db.commit()
 
@@ -768,18 +918,18 @@ def process_import_data(data, batch_id):
 
                     if not cursor.fetchone():
                         cursor.execute('''
-                            INSERT INTO parent_wishes (student_id, related_student_id, wish_type, notes, created_by)
-                            VALUES (?, ?, ?, ?, ?)
+                            INSERT INTO parent_wishes (student_id, related_student_id, wish_type, description)
+                            VALUES (?, ?, ?, ?)
                         ''', (wish['student_id'], related_student_id, wish['wish_type'],
-                              f"Automatisch importiert aus: {wish['related_names']}", session['user_id']))
+                              f"Automatisch importiert aus: {wish['related_names']}"))
                         wishes_created += 1
                 else:
                     # Name nicht gefunden - als Notiz hinzufügen
                     if related_student_id is None:
-                        errors.append(f"Freundewunsch für {wish['student_name']}: '{related_name}' nicht gefunden")
+                        errors.append({'row': '—', 'name': wish['student_name'], 'type': 'warning', 'reason': f"Wunsch: '{related_name}' nicht gefunden"})
 
         except Exception as e:
-            errors.append(f"Fehler beim Verarbeiten des Wunsches für {wish['student_name']}: {str(e)}")
+            errors.append({'row': '—', 'name': wish['student_name'], 'type': 'warning', 'reason': f"Fehler bei Wunsch: {str(e)}"})
 
     db.commit()
     db.close()
@@ -949,6 +1099,217 @@ def delete_all_students():
     flash(f'Alle {count} Schüler wurden gelöscht.', 'success')
     return redirect(url_for('students'))
 
+@app.route('/students/generate_testdata', methods=['POST'])
+@login_required
+def generate_testdata():
+    """Fiktive Testdaten generieren (nur für Testzwecke)"""
+
+    # ── Namenslisten ──────────────────────────────────────────────
+    VORNAMEN_M = [
+        "Alexander", "Ben", "Daniel", "Emil", "Felix", "Jonas", "Leon", "Luca",
+        "Maximilian", "Noah", "Paul", "Tim", "Tom", "Elias", "Finn", "Jan",
+        "Luis", "Lukas", "Niklas", "Oscar", "Samuel", "Simon", "David", "Max",
+        "Tobias", "Florian", "Moritz", "Julian", "Fabian", "Stefan",
+    ]
+    VORNAMEN_W = [
+        "Anna", "Clara", "Emma", "Hannah", "Julia", "Laura", "Lea", "Lena",
+        "Lisa", "Maria", "Mia", "Paula", "Sarah", "Sophie", "Charlotte", "Emily",
+        "Emilia", "Johanna", "Lara", "Luisa", "Marie", "Nele", "Amelie", "Zoe",
+        "Katharina", "Franziska", "Nicole", "Sandra", "Isabella", "Valentina",
+    ]
+    NACHNAMEN = [
+        "Müller", "Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner",
+        "Becker", "Schulz", "Hoffmann", "Koch", "Bauer", "Richter", "Klein",
+        "Wolf", "Schröder", "Neumann", "Braun", "Werner", "Schwarz",
+        "Zimmermann", "Krüger", "Hartmann", "Lange", "Schmitt", "Krause",
+        "Meier", "Lehmann", "Huber", "Mayer", "Herrmann", "König", "Walter",
+        "Peters", "Lang", "Berger", "Winkler", "Frank", "Vogel", "Roth",
+        "Beck", "Brandt", "Haas", "Schäfer", "Graf", "Fuchs", "Kaiser",
+    ]
+    ORTE = [
+        "Musterstadt", "Musterstadt", "Musterstadt", "Musterstadt",
+        "Nordviertel", "Nordviertel", "Südviertel", "Südviertel",
+        "Westend", "Westend", "Kleinbach", "Kleinbach",
+        "Großhausen", "Großhausen", "Feldkirchen", "Feldkirchen",
+        "Bergheim", "Bergheim", "Seebach", "Waldorf",
+        "Oberdorf", "Niederdorf", "Steinhausen", "Kirchdorf",
+    ]
+    RELIGIONEN = ["ethik", "ethik", "katholisch", "katholisch", "evangelisch", "evangelisch", ""]
+    FOERDERBEDARFE = ["hoerschaedigung", "sprache", "sozial_emotional", "lernen", "sehen", "kme"]
+    NOTIZEN = [
+        "Sehr schüchtern, braucht Zeit",
+        "Schulangst bekannt",
+        "Fremdsprachig, Deutsch noch ausbaufähig",
+        "Teilleistungsschwäche Lesen",
+        "LRS-Verdacht",
+        "Hochbegabung vermutet",
+    ]
+
+    try:
+        anzahl = int(request.form.get('anzahl', 100))
+        anzahl = max(10, min(300, anzahl))  # Sicherheitsklammer: 10–300
+    except (ValueError, TypeError):
+        anzahl = 100
+
+    with_wishes = request.form.get('with_wishes') == '1'
+    with_ib = request.form.get('with_ib') == '1'
+    with_vm = request.form.get('with_vm') == '1'
+    with_foerder = request.form.get('with_foerder') == '1'
+
+    batch_id = f"TESTDATA-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+    rng = random.Random()  # eigener RNG, beeinflusst nicht globalen Zustand
+
+    db = get_db()
+    cursor = db.cursor()
+
+    # ── Duplikate im gleichen Batch vermeiden ─────────────────────
+    used_names = set()
+
+    def pick_name(geschlecht):
+        for _ in range(300):
+            vn = rng.choice(VORNAMEN_M if geschlecht == 'm' else VORNAMEN_W)
+            nn = rng.choice(NACHNAMEN)
+            key = (vn.lower(), nn.lower())
+            if key not in used_names:
+                used_names.add(key)
+                return vn, nn
+        return (rng.choice(VORNAMEN_M if geschlecht == 'm' else VORNAMEN_W),
+                rng.choice(NACHNAMEN) + str(rng.randint(2, 9)))
+
+    # ── IB / VM / Förderbedarf Indices bestimmen ──────────────────
+    all_indices = list(range(anzahl))
+    rng.shuffle(all_indices)
+
+    ib_count = round(anzahl * 0.10) if with_ib else 0
+    vm_count = min(12, round(anzahl * 0.12)) if with_vm else 0
+    foerder_count = min(8, round(anzahl * 0.08)) if with_foerder else 0
+
+    ib_set = set(all_indices[:ib_count])
+    vm_set = set(all_indices[ib_count:ib_count + vm_count])
+    foerder_set = set(all_indices[ib_count + vm_count:ib_count + vm_count + foerder_count])
+
+    # ── Schüler erzeugen ──────────────────────────────────────────
+    student_ids = []
+
+    for i in range(anzahl):
+        geschlecht = rng.choice(['m', 'm', 'w', 'w', 'd'])
+        if geschlecht == 'd':
+            geschlecht = rng.choice(['m', 'w'])
+
+        vorname, nachname = pick_name(geschlecht)
+        wohnort = rng.choice(ORTE)
+        religion = rng.choice(RELIGIONEN)
+        sportlich = 1 if rng.random() < 0.22 else 0
+        sport_interesse = 1 if rng.random() < 0.15 else 0
+
+        if i in ib_set:
+            schulform = 'IB'
+        else:
+            r = rng.random()
+            schulform = 'H' if r < 0.25 else ('R' if r < 0.62 else 'G')
+
+        special_needs = ''
+        notes_parts = []
+        if i in foerder_set:
+            special_needs = rng.choice(FOERDERBEDARFE)
+        if i in vm_set:
+            notes_parts.append('VM: Vorbeugende Maßnahme')
+        if rng.random() < 0.08:
+            notes_parts.append(rng.choice(NOTIZEN))
+
+        notes = ' | '.join(notes_parts)
+
+        cursor.execute('''
+            INSERT INTO students
+                (firstname, lastname, gender, wohnort, schulform, religion,
+                 sportlich, sport_interesse, special_needs, notes,
+                 created_by, import_batch_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (vorname, nachname, geschlecht, wohnort, schulform, religion,
+              sportlich, sport_interesse, special_needs, notes,
+              session['user_id'], batch_id))
+
+        student_ids.append(cursor.lastrowid)
+
+    db.commit()
+
+    # ── Elternwünsche ─────────────────────────────────────────────
+    wishes_created = 0
+    if with_wishes and len(student_ids) >= 4:
+        together_count = round(len(student_ids) * 0.25)
+        separated_count = round(len(student_ids) * 0.10)
+        used_in_wish = set()
+
+        shuffled = student_ids[:]
+        rng.shuffle(shuffled)
+
+        # Zusammen-Wünsche (Paare, bidirektional)
+        i = 0
+        pairs = 0
+        while pairs < together_count // 2 and i + 1 < len(shuffled):
+            a, b = shuffled[i], shuffled[i + 1]
+            if a not in used_in_wish and b not in used_in_wish:
+                cursor.execute(
+                    'INSERT INTO parent_wishes (student_id, wish_type, related_student_id, description) VALUES (?, ?, ?, ?)',
+                    (a, 'together', b, 'Testdaten – Freundschaftswunsch'))
+                cursor.execute(
+                    'INSERT INTO parent_wishes (student_id, wish_type, related_student_id, description) VALUES (?, ?, ?, ?)',
+                    (b, 'together', a, 'Testdaten – Freundschaftswunsch'))
+                used_in_wish.add(a)
+                used_in_wish.add(b)
+                wishes_created += 2
+                pairs += 1
+            i += 2
+
+        # Getrennt-Wünsche (einseitig)
+        remaining = [sid for sid in shuffled if sid not in used_in_wish]
+        rng.shuffle(remaining)
+        for j in range(0, min(separated_count * 2, len(remaining) - 1), 2):
+            a, b = remaining[j], remaining[j + 1]
+            cursor.execute(
+                'INSERT INTO parent_wishes (student_id, wish_type, related_student_id, description) VALUES (?, ?, ?, ?)',
+                (a, 'separated', b, 'Testdaten – Trennungswunsch'))
+            wishes_created += 1
+
+        db.commit()
+
+    db.close()
+
+    msg = f'{anzahl} fiktive Testschüler wurden generiert (Batch: {batch_id})'
+    if wishes_created:
+        msg += f', {wishes_created} Elternwünsche erstellt'
+    msg += '. Testdaten sind an der Markierung «Importiert» erkennbar.'
+    flash(msg, 'success')
+    return redirect(url_for('students'))
+
+
+@app.route('/students/delete_testdata', methods=['POST'])
+@login_required
+def delete_testdata():
+    """Alle Testdaten-Schüler (import_batch_id beginnt mit 'TESTDATA-') löschen"""
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM students WHERE import_batch_id LIKE 'TESTDATA-%'")
+    ids = [row[0] for row in cursor.fetchall()]
+
+    if not ids:
+        flash('Keine Testdaten vorhanden.', 'info')
+        db.close()
+        return redirect(url_for('students'))
+
+    placeholders = ','.join('?' * len(ids))
+    cursor.execute(f'DELETE FROM parent_wishes WHERE student_id IN ({placeholders})', ids)
+    cursor.execute(f'DELETE FROM parent_wishes WHERE related_student_id IN ({placeholders})', ids)
+    cursor.execute(f"DELETE FROM students WHERE import_batch_id LIKE 'TESTDATA-%'")
+    db.commit()
+    db.close()
+
+    flash(f'{len(ids)} Testschüler und alle zugehörigen Elternwünsche wurden gelöscht.', 'success')
+    return redirect(url_for('students'))
+
+
 @app.route('/wishes')
 @login_required
 def wishes():
@@ -1116,6 +1477,8 @@ def generate():
             if len(ib_students) > num_classes * ib_max:
                 flash(f'⚠️ Zu viele IB-Schüler ({len(ib_students)}) für {num_classes} Klassen mit max {ib_max} pro Klasse', 'warning')
 
+        ib_class_size = int(request.form.get('ib_class_size', '22'))
+
         options = {
             'gender_balance': 'gender_balance' in request.form,
             'parent_wishes': 'parent_wishes' in request.form,
@@ -1126,6 +1489,7 @@ def generate():
             'specialized_classes': specialized_classes,
             'ib_min': ib_min,
             'ib_max': ib_max,
+            'ib_class_size': ib_class_size,
         }
     else:
         options = {
@@ -1138,6 +1502,7 @@ def generate():
             'specialized_classes': {'sport': 0, 'custom': 0, 'custom_name': ''},
             'ib_min': 2,
             'ib_max': 5,
+            'ib_class_size': 22,
         }
 
     # 3 verschiedene Einteilungen generieren
@@ -1145,6 +1510,53 @@ def generate():
     for i in range(3):
         proposal = generate_class_assignment(students, wishes, num_classes, i, options)
         proposals.append(proposal)
+
+    # ── Vergleichsmetriken pro Vorschlag berechnen ────────────────
+    import math as _math
+    for proposal in proposals:
+        # Schüler → Klassen-Mapping aufbauen
+        student_class_map = {}
+        for cls in proposal['classes']:
+            for s in cls['students']:
+                student_class_map[s['id']] = cls['number']
+
+        # Wunscherfüllungsrate
+        wish_total = wish_fulfilled = 0
+        for w in wishes:
+            rid = w['related_student_id']
+            if not rid or rid not in student_class_map:
+                continue
+            wish_total += 1
+            sc = student_class_map.get(w['student_id'])
+            rc = student_class_map.get(rid)
+            if sc and rc:
+                if w['wish_type'] == 'together' and sc == rc:
+                    wish_fulfilled += 1
+                elif w['wish_type'] == 'separated' and sc != rc:
+                    wish_fulfilled += 1
+        proposal['statistics']['wish_fulfilled'] = wish_fulfilled
+        proposal['statistics']['wish_total'] = wish_total
+        proposal['statistics']['wish_rate'] = (
+            round(wish_fulfilled / wish_total * 100) if wish_total > 0 else None
+        )
+
+        # Geschlechterbalance-Score (100 = perfekt ausgeglichen)
+        ratios = []
+        for cls in proposal['classes']:
+            m_cnt = cls['gender_count']['m']
+            w_cnt = cls['gender_count']['w']
+            total_gend = m_cnt + w_cnt
+            if total_gend > 0:
+                ratios.append(m_cnt / total_gend)
+        if ratios:
+            mean_r = sum(ratios) / len(ratios)
+            stddev = _math.sqrt(sum((r - mean_r) ** 2 for r in ratios) / len(ratios))
+            proposal['statistics']['gender_balance_score'] = max(0, round((1 - stddev * 6) * 100))
+        else:
+            proposal['statistics']['gender_balance_score'] = 100
+
+        # Schüler-IDs pro Klasse als Liste für JS-Vergleich
+        proposal['statistics']['student_class_map'] = student_class_map
 
     # Proposals in Session speichern für Export
     session['last_proposals'] = proposals
@@ -1174,6 +1586,179 @@ def extract_plz_from_wohnort(wohnort):
     if match:
         return match.group(1)
     return None
+
+def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None):
+    """
+    Post-Processing: Verbessert Wunsch-Erfüllungsrate durch iterativen Schüler-Tausch.
+    - Tauscht bevorzugt gleichgeschlechtliche Schüler (Geschlechterbalance bleibt erhalten)
+    - Verschiebt Schüler wenn Zielklasse noch Platz hat
+    - Wiederholt bis keine Verbesserung mehr möglich (max. max_rounds Durchläufe)
+    """
+    num_classes = len(classes)
+    if options is None:
+        options = {}
+    ib_min = options.get('ib_min', 0)
+    ib_max = options.get('ib_max', 0)
+
+    def ib_count_for(cls):
+        return sum(1 for s in cls if s.get('schulform') == 'IB')
+
+    def ib_move_allowed(student, from_cls, to_cls):
+        """Prüft ob Verschieben eines IB-Schülers die Constraints verletzt."""
+        if student.get('schulform') != 'IB' or ib_min == 0:
+            return True
+        # Quellklasse darf nicht unter ib_min fallen (außer sie hat bereits zu wenig)
+        from_ib = ib_count_for(from_cls)
+        if from_ib - 1 > 0 and from_ib - 1 < ib_min:
+            return False  # würde Einzelkämpfer in Quellklasse erzeugen
+        # Zielklasse darf nicht über ib_max steigen
+        if ib_max > 0 and ib_count_for(to_cls) + 1 > ib_max:
+            return False
+        return True
+
+    # student_id → Klassen-Index
+    student_to_class = {}
+    for i, cls in enumerate(classes):
+        for s in cls:
+            student_to_class[s['id']] = i
+
+    # Schneller Zugriff auf Schüler-Objekte
+    all_students = {s['id']: s for cls in classes for s in cls}
+
+    def total_wish_score():
+        score = 0
+        for sid, wlist in wish_dict.items():
+            if sid not in student_to_class:
+                continue
+            for w in wlist:
+                rid = w['related_student_id']
+                if not rid or rid not in student_to_class:
+                    continue
+                same = student_to_class[sid] == student_to_class[rid]
+                if w['wish_type'] == 'together' and same:
+                    score += 1
+                elif w['wish_type'] == 'separated' and not same:
+                    score += 1
+        return score
+
+    current_score = total_wish_score()
+
+    for _ in range(max_rounds):
+        improved = False
+
+        # --- Unerfüllte Zusammen-Wünsche ---
+        for sid, wlist in list(wish_dict.items()):
+            for w in wlist:
+                if w['wish_type'] != 'together':
+                    continue
+                rid = w['related_student_id']
+                if not rid:
+                    continue
+                if sid not in student_to_class or rid not in student_to_class:
+                    continue
+
+                class_a = student_to_class[sid]
+                class_b = student_to_class[rid]
+                if class_a == class_b:
+                    continue
+
+                s_obj = all_students.get(sid)
+                if not s_obj:
+                    continue
+                gender = s_obj.get('gender', '')
+
+                # Option 1: Verschiebe sid nach class_b wenn Platz vorhanden
+                if len(classes[class_b]) < MAX_CLASS_SIZE and ib_move_allowed(s_obj, classes[class_a], classes[class_b]):
+                    student_to_class[sid] = class_b
+                    new_score = total_wish_score()
+                    if new_score > current_score:
+                        classes[class_a].remove(s_obj)
+                        classes[class_b].append(s_obj)
+                        current_score = new_score
+                        improved = True
+                        break
+                    else:
+                        student_to_class[sid] = class_a  # rückgängig
+
+                # Option 2: Tausche sid mit gleichgeschlechtlichem Schüler aus class_b
+                for candidate in list(classes[class_b]):
+                    if candidate['id'] == rid:
+                        continue
+                    if candidate.get('gender', '') != gender:
+                        continue
+                    if not ib_move_allowed(s_obj, classes[class_a], classes[class_b]):
+                        continue
+                    if not ib_move_allowed(candidate, classes[class_b], classes[class_a]):
+                        continue
+                    cid = candidate['id']
+                    # In-place tauschen und testen
+                    student_to_class[sid] = class_b
+                    student_to_class[cid] = class_a
+                    new_score = total_wish_score()
+                    if new_score > current_score:
+                        classes[class_a].remove(s_obj)
+                        classes[class_b].remove(candidate)
+                        classes[class_b].append(s_obj)
+                        classes[class_a].append(candidate)
+                        current_score = new_score
+                        improved = True
+                        break
+                    else:
+                        student_to_class[sid] = class_a  # rückgängig
+                        student_to_class[cid] = class_b
+
+                if improved:
+                    break
+            if improved:
+                break
+
+        if not improved:
+            # --- Verletzte Getrennt-Wünsche ---
+            for sid, wlist in list(wish_dict.items()):
+                for w in wlist:
+                    if w['wish_type'] != 'separated':
+                        continue
+                    rid = w['related_student_id']
+                    if not rid:
+                        continue
+                    if sid not in student_to_class or rid not in student_to_class:
+                        continue
+                    if student_to_class[sid] != student_to_class[rid]:
+                        continue
+
+                    s_obj = all_students.get(sid)
+                    if not s_obj:
+                        continue
+                    class_a = student_to_class[sid]
+
+                    for target in range(num_classes):
+                        if target == class_a:
+                            continue
+                        if len(classes[target]) >= MAX_CLASS_SIZE:
+                            continue
+                        if not ib_move_allowed(s_obj, classes[class_a], classes[target]):
+                            continue
+                        student_to_class[sid] = target
+                        new_score = total_wish_score()
+                        if new_score > current_score:
+                            classes[class_a].remove(s_obj)
+                            classes[target].append(s_obj)
+                            current_score = new_score
+                            improved = True
+                            break
+                        else:
+                            student_to_class[sid] = class_a
+
+                    if improved:
+                        break
+                if improved:
+                    break
+
+        if not improved:
+            break  # Keine weitere Verbesserung möglich
+
+    return current_score
+
 
 def generate_class_assignment(students, wishes, num_classes, seed, options):
     """Intelligente Klasseneinteilung generieren"""
@@ -1250,9 +1835,86 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
             wish_dict[student_id] = []
         wish_dict[student_id].append(wish)
 
+    # Rückwärts-Wunsch-Dict: related_student_id → Wünsche anderer Schüler über diesen Schüler
+    # Ermöglicht bidirektionale Wunsch-Prüfung (wichtig wenn Wunschsteller zuerst platziert wurde)
+    reverse_wish_dict = {}
+    for sid, student_wishes in wish_dict.items():
+        for wish in student_wishes:
+            related_id = wish['related_student_id']
+            if related_id:
+                if related_id not in reverse_wish_dict:
+                    reverse_wish_dict[related_id] = []
+                reverse_wish_dict[related_id].append(wish)
+
+    # Smarte Anfangs-Reihenfolge: Schüler die von vielen anderen gewünscht werden zuerst platzieren.
+    # Wenn sie in einer Klasse sind, finden ihre Freunde sie durch den bidirektionalen Check.
+    wish_target_count = {}
+    for wish in wishes:
+        rid = wish['related_student_id']
+        if rid:
+            wish_target_count[rid] = wish_target_count.get(rid, 0) + 1
+
+    if not (sport_count > 0 or options.get('sportklasse', False)):
+        # Sortiere nach Anzahl der Wünsche über diesen Schüler (absteigende), innerhalb gleicher Gruppe zufällig
+        student_list.sort(key=lambda s: -wish_target_count.get(s['id'], 0))
+        # Innerhalb gleicher Gruppen zufällig mischen (für Varietät zwischen Vorschlägen)
+        from itertools import groupby
+        shuffled = []
+        for _, grp in groupby(student_list, key=lambda s: wish_target_count.get(s['id'], 0)):
+            grp_list = list(grp)
+            random.shuffle(grp_list)
+            shuffled.extend(grp_list)
+        student_list = shuffled
+
+    # IB-Vorverteilung: Schüler deterministisch in Gruppen vorverteilen (garantiert kein Einzelkämpfer)
+    if options.get('ib_min', 0) > 0 and options.get('ib_max', 0) > 0:
+        ib_min = options.get('ib_min', 0)
+        ib_max = options.get('ib_max', 0)
+        ib_students_pre = [s for s in student_list if s.get('schulform') == 'IB']
+        student_list = [s for s in student_list if s.get('schulform') != 'IB']
+        random.shuffle(ib_students_pre)
+
+        num_ib = len(ib_students_pre)
+        num_ib_classes = min(num_classes, num_ib // ib_min) if ib_min > 0 else num_classes
+
+        if num_ib_classes > 0:
+            for idx, student in enumerate(ib_students_pre):
+                target_class = idx % num_ib_classes
+                # Falls Maximum erreicht, nächste Klasse mit Platz suchen
+                if ib_count[target_class] >= ib_max:
+                    for alt in range(num_ib_classes):
+                        if ib_count[alt] < ib_max:
+                            target_class = alt
+                            break
+                classes[target_class].append(student)
+                ib_count[target_class] += 1
+                gender = student.get('gender', 'm')
+                if gender in gender_count[target_class]:
+                    gender_count[target_class][gender] += 1
+                wohnort = student.get('wohnort', '').strip()
+                if wohnort:
+                    wohnort_count[target_class][wohnort] = wohnort_count[target_class].get(wohnort, 0) + 1
+                    city = extract_city_from_wohnort(wohnort)
+                    if city:
+                        city_count[target_class][city] = city_count[target_class].get(city, 0) + 1
+                    plz = extract_plz_from_wohnort(wohnort)
+                    if plz:
+                        plz_count[target_class][plz] = plz_count[target_class].get(plz, 0) + 1
+                schulform = student.get('schulform', '').strip()
+                if schulform and schulform in schulform_count[target_class]:
+                    schulform_count[target_class][schulform] += 1
+                religion = student.get('religion', '') or ''
+                if religion in religion_count[target_class]:
+                    religion_count[target_class][religion] += 1
+                if student.get('special_needs', ''):
+                    inklusion_count[target_class] += 1
+        else:
+            # Zu wenige IB-Schüler für ib_min → normal verteilen
+            student_list = ib_students_pre + student_list
+
     # Schüler auf Klassen verteilen
     for student in student_list:
-        best_class = find_best_class(student, classes, gender_count, wohnort_count, city_count, plz_count, schulform_count, religion_count, inklusion_count, ib_count, wish_dict, num_classes, options, specialized_mapping)
+        best_class = find_best_class(student, classes, gender_count, wohnort_count, city_count, plz_count, schulform_count, religion_count, inklusion_count, ib_count, wish_dict, num_classes, options, specialized_mapping, reverse_wish_dict)
         classes[best_class].append(student)
 
         # Geschlechterzähler aktualisieren
@@ -1302,6 +1964,36 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
         # IB-Zähler aktualisieren
         if student.get('schulform') == 'IB':
             ib_count[best_class] += 1
+
+    # Post-Processing: Wunsch-Erfüllungsrate durch iterativen Tausch verbessern
+    optimize_assignment_wishes(classes, wish_dict, options=options)
+
+    # Statistiken nach Optimierung neu berechnen (Klassen-Zusammensetzung hat sich geändert)
+    gender_count = [{'m': 0, 'w': 0} for _ in range(num_classes)]
+    wohnort_count = [{} for _ in range(num_classes)]
+    schulform_count = [{'H': 0, 'R': 0, 'G': 0, 'IB': 0, '': 0} for _ in range(num_classes)]
+    religion_count = [{'ethik': 0, 'katholisch': 0, 'evangelisch': 0, '': 0} for _ in range(num_classes)]
+    inklusion_count = [0] * num_classes
+    ib_count = [0] * num_classes
+
+    for i, cls in enumerate(classes):
+        for s in cls:
+            g = s.get('gender', 'm')
+            if g in gender_count[i]:
+                gender_count[i][g] += 1
+            wo = s.get('wohnort', '').strip()
+            if wo:
+                wohnort_count[i][wo] = wohnort_count[i].get(wo, 0) + 1
+            sf = s.get('schulform', '').strip()
+            if sf in schulform_count[i]:
+                schulform_count[i][sf] += 1
+            rel = s.get('religion', '') or ''
+            if rel in religion_count[i]:
+                religion_count[i][rel] += 1
+            if s.get('special_needs', ''):
+                inklusion_count[i] += 1
+            if s.get('schulform') == 'IB':
+                ib_count[i] += 1
 
     # Ergebnis formatieren
     result = {
@@ -1357,7 +2049,7 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
 
     return result
 
-def find_best_class(student, classes, gender_count, wohnort_count, city_count, plz_count, schulform_count, religion_count, inklusion_count, ib_count, wish_dict, num_classes, options, specialized_mapping=None):
+def find_best_class(student, classes, gender_count, wohnort_count, city_count, plz_count, schulform_count, religion_count, inklusion_count, ib_count, wish_dict, num_classes, options, specialized_mapping=None, reverse_wish_dict=None):
     """Beste Klasse für einen Schüler finden"""
     scores = []
     ib_min = options.get('ib_min', 0)
@@ -1365,13 +2057,23 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
     is_ib_student = student.get('schulform') == 'IB'
     if specialized_mapping is None:
         specialized_mapping = {}
+    if reverse_wish_dict is None:
+        reverse_wish_dict = {}
+
+    ib_class_size = options.get('ib_class_size', 0)
+    student_special = student.get('special_needs', '')
+    is_ikl = bool(student.get('ikl', 0))
 
     for i, cls in enumerate(classes):
         score = 0
 
-        # HARTE GRENZE: Maximale Klassengröße (25 Schüler)
-        if len(cls) >= MAX_CLASS_SIZE:
-            score -= 10000  # Extrem harte Blockade - Klasse ist voll
+        # HARTE GRENZE: Klassengröße
+        # IB-Klassen bekommen ein reduziertes Maximum (konfigurierbar)
+        effective_max = MAX_CLASS_SIZE
+        if ib_class_size > 0 and ib_count[i] > 0:
+            effective_max = ib_class_size
+        if len(cls) >= effective_max:
+            score -= 10000
             scores.append(score)
             continue
 
@@ -1406,17 +2108,23 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                 if i == 0:
                     score -= 30  # Nicht-sportliche weg von Klasse 1
 
-        # IB Min/Max Einschränkungen
-        if ib_min > 0 and ib_max > 0 and is_ib_student:
-            current_ib = ib_count[i]
-            if current_ib == 0:
-                pass  # OK um neue IB-Klasse zu starten
-            elif current_ib < ib_min:
-                score += 30  # Starker Push um Minimum zu erreichen
-            elif ib_min <= current_ib < ib_max:
-                score += 10  # Weiter auffüllen
-            elif current_ib >= ib_max:
-                score -= 1000  # Harte Blockade - Maximum erreicht
+        # IB Max-Grenze einhalten (Vorverteilung deckt den Normalfall ab)
+        if ib_max > 0 and is_ib_student and ib_count[i] >= ib_max:
+            score -= 1000  # Harte Blockade - Maximum erreicht
+
+        # Förderbedarf Sprache: möglichst in einer Klasse bündeln
+        # ESE (sozial_emotional) wird NICHT gebündelt
+        if student_special == 'sprache':
+            sprache_in_cls = sum(1 for s in cls if s.get('special_needs') == 'sprache')
+            score += sprache_in_cls * 80  # Starker Bonus je weiteren Sprache-Schüler in Klasse
+
+        # IKL: möglichst NICHT in Klassen mit IB-Schülern
+        if is_ikl:
+            if ib_count[i] > 0:
+                score -= 500  # Starke Strafe für IKL in IB-Klasse
+            # IKL-Schüler auf Klassen verteilen (nicht alle in eine Klasse)
+            ikl_in_cls = sum(1 for s in cls if s.get('ikl', 0))
+            score -= ikl_in_cls * 60  # Penalty für Konzentration von IKL in einer Klasse
 
         # Geschlechterbalance (SEHR WICHTIG - höchste Priorität)
         if options.get('gender_balance', True):
@@ -1481,21 +2189,32 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                 if religion_count[i].get('ethik', 0) > 0:
                     score += 8  # Bonus wenn Ethik vorhanden
 
-        # Elternwünsche berücksichtigen (WICHTIG)
+        # Elternwünsche berücksichtigen (SEHR WICHTIG – höchste Priorität nach Klassengröße)
         if options.get('parent_wishes', True):
             student_id = student['id']
-            if student_id in wish_dict:
-                for wish in wish_dict[student_id]:
-                    wish_type = wish['wish_type']
-                    related_id = wish['related_student_id']
 
-                    if related_id:
-                        related_in_class = any(s['id'] == related_id for s in cls)
+            # Eigene Wünsche des Schülers prüfen
+            for wish in wish_dict.get(student_id, []):
+                wish_type = wish['wish_type']
+                related_id = wish['related_student_id']
+                if not related_id:
+                    continue
+                related_in_class = any(s['id'] == related_id for s in cls)
+                if wish_type == 'together' and related_in_class:
+                    score += 150   # Sehr hoher Bonus: "mit Freund/in zusammen"
+                elif wish_type == 'separated' and related_in_class:
+                    score -= 500   # Sehr hohe Strafe: "auf keinen Fall zusammen"
 
-                        if wish_type == 'together' and related_in_class:
-                            score += 20
-                        elif wish_type == 'separated' and related_in_class:
-                            score -= 20
+            # Rückwärts-Wünsche: Schüler X hat Wunsch über diesen Schüler
+            # (wichtig wenn X bereits platziert wurde, bevor dieser Schüler drankommt)
+            for wish in reverse_wish_dict.get(student_id, []):
+                wish_type = wish['wish_type']
+                wisher_id = wish['student_id']
+                wisher_in_class = any(s['id'] == wisher_id for s in cls)
+                if wish_type == 'together' and wisher_in_class:
+                    score += 150   # Wunschsteller ist bereits in dieser Klasse → Bonus
+                elif wish_type == 'separated' and wisher_in_class:
+                    score -= 500   # Wunschsteller ist bereits in dieser Klasse → Strafe
 
         scores.append(score)
 
@@ -1583,6 +2302,82 @@ def assignments():
     db.close()
 
     return render_template('assignments.html', assignments=assignments)
+
+@app.route('/assignments/compare')
+@login_required
+def compare_assignments():
+    """Zwei gespeicherte Einteilungen vergleichen"""
+    import json as _json
+
+    a_id = request.args.get('a', type=int)
+    b_id = request.args.get('b', type=int)
+
+    if not a_id or not b_id or a_id == b_id:
+        flash('Bitte genau zwei verschiedene Einteilungen auswählen.', 'warning')
+        return redirect(url_for('assignments'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT ca.*, u.username FROM class_assignments ca LEFT JOIN users u ON ca.created_by = u.id WHERE ca.id = ?', (a_id,))
+    assignment_a = cursor.fetchone()
+    cursor.execute('SELECT ca.*, u.username FROM class_assignments ca LEFT JOIN users u ON ca.created_by = u.id WHERE ca.id = ?', (b_id,))
+    assignment_b = cursor.fetchone()
+    db.close()
+
+    if not assignment_a or not assignment_b:
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+
+    def build_map(proposal):
+        m = {}
+        for cls in proposal.get('classes', []):
+            for s in cls.get('students', []):
+                m[s['id']] = {'class_name': cls['name'], 'firstname': s.get('firstname', ''), 'lastname': s.get('lastname', '')}
+        return m
+
+    map_a = build_map(_json.loads(assignment_a['data']))
+    map_b = build_map(_json.loads(assignment_b['data']))
+
+    all_ids = set(map_a.keys()) | set(map_b.keys())
+    rows = []
+    for sid in all_ids:
+        info = map_a.get(sid) or map_b.get(sid)
+        a_class = map_a[sid]['class_name'] if sid in map_a else '—'
+        b_class = map_b[sid]['class_name'] if sid in map_b else '—'
+        rows.append({
+            'name': f"{info['lastname']}, {info['firstname']}",
+            'a_class': a_class,
+            'b_class': b_class,
+            'changed': a_class != b_class,
+            'only_in_a': sid not in map_b,
+            'only_in_b': sid not in map_a,
+        })
+    rows.sort(key=lambda r: r['name'])
+    changed_count = sum(1 for r in rows if r['changed'])
+
+    return render_template('compare_assignments.html',
+                           assignment_a=assignment_a,
+                           assignment_b=assignment_b,
+                           rows=rows,
+                           changed_count=changed_count,
+                           total_count=len(rows))
+
+@app.route('/assignments/<int:assignment_id>/delete', methods=['POST'])
+@login_required
+def delete_assignment(assignment_id):
+    """Gespeicherte Einteilung löschen"""
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT id FROM class_assignments WHERE id = ?', (assignment_id,))
+    if not cursor.fetchone():
+        db.close()
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+    cursor.execute('DELETE FROM class_assignments WHERE id = ?', (assignment_id,))
+    db.commit()
+    db.close()
+    flash('Einteilung wurde gelöscht.', 'success')
+    return redirect(url_for('assignments'))
 
 @app.route('/assignments/<int:assignment_id>')
 @login_required
@@ -1889,19 +2684,23 @@ def generate_pdf_export(proposal):
         elements.append(Spacer(1, 0.5*cm))
 
         # Schülerliste
-        student_data = [['Nachname', 'Vorname', 'Geschlecht', 'Schulform', 'IB']]
+        student_data = [['Nachname', 'Vorname', 'Gesch.', 'Schulform', 'Wohnort']]
         for student in sorted(class_data['students'], key=lambda s: (s['lastname'], s['firstname'])):
             schulform = student.get('schulform', '')
-            is_ib = 'Ja' if schulform == 'IB' else ''
+            # Nur PLZ + Ort (ohne Straße/Hausnummer)
+            raw_wohnort = student.get('wohnort', '')
+            plz_ort = extract_city_from_wohnort(raw_wohnort)
+            wohnort = normalize_text(plz_ort if plz_ort else raw_wohnort)
+
             student_data.append([
                 normalize_text(student['lastname']),
                 normalize_text(student['firstname']),
                 student.get('gender', ''),
                 schulform,
-                is_ib
+                wohnort
             ])
 
-        student_table = Table(student_data, colWidths=[5*cm, 5*cm, 2.5*cm, 2.5*cm, 2*cm])
+        student_table = Table(student_data, colWidths=[4.5*cm, 4.5*cm, 1.5*cm, 2*cm, 4.5*cm])
         student_table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
@@ -1933,11 +2732,12 @@ def generate_pdf_export(proposal):
 @app.route('/check_conflicts', methods=['POST'])
 @login_required
 def check_conflicts():
-    """Check for conflicts after student movement"""
+    """Prüft Elternwunsch-Konflikte VOR dem Verschieben eines Schülers"""
     data = request.get_json()
-    student_id = data.get('student_id')
-    target_class = data.get('target_class')
-    modifications = data.get('modifications', {})
+    student_id = str(data.get('student_id', ''))
+    target_class = str(data.get('target_class', ''))
+    # current_state: dict {student_id -> class_id} built from current DOM
+    current_state = {str(k): str(v) for k, v in data.get('current_state', {}).items()}
 
     conflicts = []
 
@@ -1945,58 +2745,68 @@ def check_conflicts():
         db = get_db()
         cursor = db.cursor()
 
-        # Get student data
         cursor.execute('SELECT * FROM students WHERE id = ?', (student_id,))
         student = cursor.fetchone()
-
         if not student:
+            db.close()
             return jsonify({'conflicts': []})
 
-        # Get all parent wishes for this student
+        # Alle Wünsche die diesen Schüler betreffen (als Wünscher oder als Ziel)
         cursor.execute('''
             SELECT pw.*,
-                   s1.firstname || ' ' || s1.lastname as student_name,
-                   s2.firstname || ' ' || s2.lastname as related_student_name
+                   s1.id as wisher_id,
+                   s1.firstname || ' ' || s1.lastname as wisher_name,
+                   s2.id as target_id,
+                   s2.firstname || ' ' || s2.lastname as target_name
             FROM parent_wishes pw
             JOIN students s1 ON pw.student_id = s1.id
             LEFT JOIN students s2 ON pw.related_student_id = s2.id
             WHERE pw.student_id = ? OR pw.related_student_id = ?
         ''', (student_id, student_id))
         wishes = cursor.fetchall()
+        db.close()
 
-        # Check friend wishes
         for wish in wishes:
+            # Bestimme die "andere" Person (nicht der verschobene Schüler)
+            if str(wish['wisher_id']) == student_id:
+                other_id = str(wish['target_id']) if wish['target_id'] else None
+                other_name = wish['target_name'] or '?'
+                moved_name = wish['wisher_name']
+            else:
+                other_id = str(wish['wisher_id'])
+                other_name = wish['wisher_name']
+                moved_name = wish['target_name'] or '?'
+
+            if not other_id:
+                continue
+
+            # Aktuelle Klasse der anderen Person aus DOM-State
+            other_class = current_state.get(other_id)
+
             if wish['wish_type'] == 'together':
-                # Check if both students would still be in same class
-                related_id = wish['related_student_id']
-                if related_id:
-                    # Check if related student was also moved
-                    related_new_class = modifications.get(str(related_id), {}).get('to')
-                    if related_new_class and related_new_class != target_class:
-                        conflicts.append({
-                            'type': 'friend_wish',
-                            'severity': 'high',
-                            'message': f"{wish['student_name']} möchte mit {wish['related_student_name']} zusammen sein"
-                        })
+                # Konflikt: nach Verschiebung wären beide in verschiedenen Klassen
+                if other_class and other_class != target_class:
+                    conflicts.append({
+                        'type': 'friend_wish',
+                        'severity': 'high',
+                        'message': f'Zusammen-Wunsch verletzt: {moved_name} und {other_name} wären in verschiedenen Klassen'
+                    })
+                elif not other_class:
+                    # Position unbekannt – vorsichtshalber hinweisen
+                    conflicts.append({
+                        'type': 'friend_wish',
+                        'severity': 'medium',
+                        'message': f'Zusammen-Wunsch: Position von {other_name} nicht bekannt'
+                    })
 
             elif wish['wish_type'] == 'separated':
-                # Check if students would be in same class
-                related_id = wish['related_student_id']
-                if related_id:
-                    related_new_class = modifications.get(str(related_id), {}).get('to')
-                    if related_new_class == target_class:
-                        conflicts.append({
-                            'type': 'separation_wish',
-                            'severity': 'high',
-                            'message': f"{wish['student_name']} soll von {wish['related_student_name']} getrennt sein"
-                        })
-
-        # Note: Full conflict checking would require the current proposal data
-        # which is not easily accessible here. For now, we focus on wish-based conflicts.
-        # Additional checks (IB limits, gender balance, inclusion) would need the complete
-        # class composition, which should be tracked in the frontend or passed with the request.
-
-        db.close()
+                # Konflikt: nach Verschiebung wären beide in derselben Klasse
+                if other_class == target_class:
+                    conflicts.append({
+                        'type': 'separation_wish',
+                        'severity': 'critical',
+                        'message': f'Trennungs-Wunsch verletzt: {moved_name} und {other_name} wären in derselben Klasse'
+                    })
 
         return jsonify({'conflicts': conflicts})
 
@@ -2076,8 +2886,164 @@ def suggest_swaps():
     except Exception as e:
         return jsonify({'suggestions': [], 'error': str(e)}), 500
 
-@app.route('/users')
+def find_student_in_classes(student_id, classes):
+    """Findet einen Schüler anhand seiner ID über alle Klassen."""
+    for cls in classes:
+        for student in cls['students']:
+            if student['id'] == student_id:
+                return student
+    return None
+
+
+def compute_transparency(proposal, wishes):
+    """Reichert jeden Schüler im Proposal mit Transparenz-Gründen (reasons) an."""
+    import copy
+    proposal = copy.deepcopy(proposal)
+
+    # Wünsche als Dictionary: student_id -> list of wishes
+    wish_dict = {}
+    for wish in wishes:
+        w = dict(wish)
+        sid = w['student_id']
+        if sid not in wish_dict:
+            wish_dict[sid] = []
+        wish_dict[sid].append(w)
+
+    classes = proposal['classes']
+
+    for cls in classes:
+        city_count = cls.get('city_count', {})
+        is_sport_class = cls.get('special_type') == 'sport' or cls.get('is_sportklasse', False)
+        class_student_ids = {s['id'] for s in cls['students']}
+
+        for student in cls['students']:
+            reasons = []
+            student_id = student['id']
+
+            # 1. Elternwünsche prüfen
+            if student_id in wish_dict:
+                for wish in wish_dict[student_id]:
+                    related_id = wish.get('related_student_id')
+                    if not related_id:
+                        continue
+                    wish_type = wish['wish_type']
+                    related = find_student_in_classes(related_id, classes)
+                    if related:
+                        related_name = f"{related['firstname']} {related['lastname']}"
+                    else:
+                        related_name = f"ID {related_id}"
+
+                    if wish_type == 'together':
+                        if related_id in class_student_ids:
+                            reasons.append({'type': 'wish_ok', 'text': f'\u2713 mit {related_name}'})
+                        else:
+                            reasons.append({'type': 'wish_fail', 'text': f'\u2717 nicht mit {related_name}'})
+                    elif wish_type == 'separated':
+                        if related_id not in class_student_ids:
+                            reasons.append({'type': 'wish_ok', 'text': f'\u2713 getrennt von {related_name}'})
+                        else:
+                            reasons.append({'type': 'wish_fail', 'text': f'\u2717 nicht getrennt von {related_name}'})
+
+            # 2. Schulweg/Wohnort – mind. 2 Schüler aus gleicher Stadt
+            wohnort = student.get('wohnort', '')
+            if wohnort:
+                city = extract_city_from_wohnort(wohnort)
+                if city and city_count.get(city, 0) >= 2:
+                    reasons.append({'type': 'wohnort', 'text': f'Schulweg: {city} ({city_count[city]} Schüler)'})
+
+            # 3. Schulform (außer IB – eigener Typ)
+            schulform = student.get('schulform', '')
+            if schulform and schulform != 'IB':
+                reasons.append({'type': 'schulform', 'text': f'Schulform: {schulform}'})
+
+            # 4. IB
+            if schulform == 'IB':
+                reasons.append({'type': 'ib', 'text': 'Inklusionsschüler'})
+
+            # 5. Förderbedarf
+            special_needs = student.get('special_needs', '')
+            if special_needs:
+                needs_map = {
+                    'hoerschaedigung': 'Hörschädigung',
+                    'sprache': 'Sprache',
+                    'sozial_emotional': 'Sozial/Emotional',
+                    'lernen': 'Lernen'
+                }
+                needs_text = needs_map.get(special_needs, special_needs)
+                reasons.append({'type': 'special_needs', 'text': f'Förderbedarf: {needs_text}'})
+
+            # 6. Sportinteresse (nur wenn in Sportklasse)
+            if student.get('sport_interesse') and is_sport_class:
+                reasons.append({'type': 'sport', 'text': 'Sportinteresse'})
+
+            # 7. Geschlechterbalance (immer)
+            reasons.append({'type': 'gender', 'text': 'Geschlechterbalance'})
+
+            student['reasons'] = reasons
+
+    return proposal
+
+
+@app.route('/generate/transparency/<int:proposal_idx>')
 @login_required
+def generate_transparency(proposal_idx):
+    """Transparenzseite für einen generierten Vorschlag"""
+    proposals = session.get('last_proposals', [])
+    if not proposals or proposal_idx >= len(proposals):
+        flash('Keine gültige Einteilung gefunden. Bitte generieren Sie zuerst eine Einteilung.', 'danger')
+        return redirect(url_for('generate'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT * FROM parent_wishes')
+    wishes = cursor.fetchall()
+    db.close()
+
+    proposal = compute_transparency(proposals[proposal_idx], wishes)
+
+    return render_template('transparency.html',
+                           proposal=proposal,
+                           proposal_idx=proposal_idx,
+                           source='generate')
+
+
+@app.route('/assignments/<int:assignment_id>/transparency')
+@login_required
+def assignment_transparency(assignment_id):
+    """Transparenzseite für eine gespeicherte Einteilung"""
+    import json
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('''
+        SELECT ca.*, u.username
+        FROM class_assignments ca
+        LEFT JOIN users u ON ca.created_by = u.id
+        WHERE ca.id = ?
+    ''', (assignment_id,))
+    assignment = cursor.fetchone()
+
+    if not assignment:
+        db.close()
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+
+    proposal = json.loads(assignment['data'])
+
+    cursor.execute('SELECT * FROM parent_wishes')
+    wishes = cursor.fetchall()
+    db.close()
+
+    proposal = compute_transparency(proposal, wishes)
+
+    return render_template('transparency.html',
+                           proposal=proposal,
+                           assignment=assignment,
+                           source='saved')
+
+
+@app.route('/users')
+@admin_required
 def users():
     """Benutzerverwaltung"""
     db = get_db()
@@ -2089,7 +3055,7 @@ def users():
     return render_template('users.html', users=users)
 
 @app.route('/users/add', methods=['GET', 'POST'])
-@login_required
+@admin_required
 def add_user():
     """Benutzer hinzufügen"""
     db = get_db()
@@ -2137,7 +3103,7 @@ def add_user():
     return render_template('add_user.html')
 
 @app.route('/users/delete/<int:user_id>', methods=['POST'])
-@login_required
+@admin_required
 def delete_user(user_id):
     """Benutzer löschen"""
     # Verhindere Selbstlöschung
@@ -2153,6 +3119,80 @@ def delete_user(user_id):
 
     flash('Benutzer wurde gelöscht.', 'success')
     return redirect(url_for('users'))
+
+@app.route('/users/reset-password/<int:user_id>', methods=['POST'])
+@admin_required
+def reset_user_password(user_id):
+    """Admin setzt Passwort eines Benutzers zurück (ohne altes Passwort)"""
+    new_password = request.form.get('new_password', '')
+    new_password_confirm = request.form.get('new_password_confirm', '')
+
+    if new_password != new_password_confirm:
+        flash('Die neuen Passwörter stimmen nicht überein.', 'danger')
+        return redirect(url_for('users'))
+
+    is_valid, error_msg = validate_password(new_password)
+    if not is_valid:
+        flash(error_msg, 'danger')
+        return redirect(url_for('users'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT id, username FROM users WHERE id = ?', (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        db.close()
+        flash('Benutzer nicht gefunden.', 'danger')
+        return redirect(url_for('users'))
+
+    password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+    cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (password_hash, user_id))
+    db.commit()
+    db.close()
+
+    flash(f'Passwort für {user["username"]} wurde zurückgesetzt.', 'success')
+    return redirect(url_for('users'))
+
+
+@app.route('/users/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    """Eigenes Passwort ändern"""
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        new_password_confirm = request.form.get('new_password_confirm', '')
+
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],))
+        user = cursor.fetchone()
+
+        if not check_password_hash(user['password_hash'], current_password):
+            db.close()
+            flash('Aktuelles Passwort ist falsch.', 'danger')
+            return render_template('change_password.html')
+
+        if new_password != new_password_confirm:
+            db.close()
+            flash('Die neuen Passwörter stimmen nicht überein.', 'danger')
+            return render_template('change_password.html')
+
+        is_valid, error_msg = validate_password(new_password)
+        if not is_valid:
+            db.close()
+            flash(error_msg, 'danger')
+            return render_template('change_password.html')
+
+        password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+        cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (password_hash, session['user_id']))
+        db.commit()
+        db.close()
+
+        flash('Passwort erfolgreich geändert.', 'success')
+        return redirect(url_for('dashboard'))
+
+    return render_template('change_password.html')
 
 # Error Handlers
 @app.errorhandler(404)

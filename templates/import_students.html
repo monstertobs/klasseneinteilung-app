@@ -44,6 +44,7 @@ Leon;Müller;m;ethik;ja;;Sehr sportlich</pre>
         <p style="margin-bottom: 0;"><strong>💡 Tipp:</strong> Die Import-Funktion erkennt verschiedene Spaltennamen automatisch.</p>
     </div>
 
+    {% if not import_results %}
     <form method="POST" action="{{ url_for('import_students') }}" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
@@ -59,7 +60,96 @@ Leon;Müller;m;ethik;ja;;Sehr sportlich</pre>
             <button type="submit" class="btn btn-primary">Importieren</button>
         </div>
     </form>
+    {% endif %}
 </div>
+
+{% if import_results %}
+<div class="form-container" style="margin-top: 2rem;">
+    <h3 style="margin-top:0;">Import-Ergebnis: <span style="color:#86868b; font-weight:400;">{{ import_results.filename }}</span></h3>
+
+    <!-- Zusammenfassung -->
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+        <div class="import-stat {% if import_results.imported_count > 0 %}import-stat-success{% else %}import-stat-neutral{% endif %}">
+            <span class="import-stat-num">{{ import_results.imported_count }}</span>
+            <span class="import-stat-label">Importiert</span>
+        </div>
+        <div class="import-stat {% if import_results.errors|selectattr('type','eq','error')|list|length > 0 %}import-stat-danger{% else %}import-stat-neutral{% endif %}">
+            <span class="import-stat-num">{{ import_results.errors|selectattr('type','eq','error')|list|length }}</span>
+            <span class="import-stat-label">Zeilen &uuml;bersprungen</span>
+        </div>
+        {% set warn_count = import_results.errors|selectattr('type','eq','warning')|list|length %}
+        {% if warn_count > 0 %}
+        <div class="import-stat import-stat-warning">
+            <span class="import-stat-num">{{ warn_count }}</span>
+            <span class="import-stat-label">Warnungen</span>
+        </div>
+        {% endif %}
+        {% if import_results.wishes_created > 0 %}
+        <div class="import-stat import-stat-info">
+            <span class="import-stat-num">{{ import_results.wishes_created }}</span>
+            <span class="import-stat-label">W&uuml;nsche importiert</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Fehler-Tabelle -->
+    {% if import_results.errors %}
+    <h4 style="margin-bottom:0.75rem;">Details zu &uuml;bersprungenen Zeilen &amp; Warnungen</h4>
+    <div class="table-container" style="margin-bottom:1.5rem;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width:80px;">Zeile</th>
+                    <th>Name</th>
+                    <th>Grund</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for err in import_results.errors %}
+                <tr>
+                    <td style="color:#86868b;">{{ err.row }}</td>
+                    <td>{{ err.name }}</td>
+                    <td>
+                        {% if err.type == 'error' %}
+                        <span class="badge badge-danger">{{ err.reason }}</span>
+                        {% else %}
+                        <span class="badge badge-warning">{{ err.reason }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color:#34c759; font-weight:500;">&#10003; Alle Zeilen erfolgreich importiert, keine Fehler.</p>
+    {% endif %}
+
+    <div class="form-actions">
+        <a href="{{ url_for('students') }}" class="btn btn-primary">Zur Sch&uuml;lerliste</a>
+        <a href="{{ url_for('import_students') }}" class="btn btn-secondary">Weiteren Import</a>
+    </div>
+</div>
+
+<style>
+.import-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    min-width: 110px;
+    text-align: center;
+}
+.import-stat-num { font-size: 2rem; font-weight: 700; line-height: 1; }
+.import-stat-label { font-size: 0.8rem; margin-top: 0.25rem; font-weight: 500; }
+.import-stat-success { background: #dcfce7; color: #15803d; }
+.import-stat-danger  { background: #fee2e2; color: #b91c1c; }
+.import-stat-warning { background: #fff3cd; color: #b45309; }
+.import-stat-info    { background: #dbeafe; color: #1d4ed8; }
+.import-stat-neutral { background: #f1f5f9; color: #64748b; }
+</style>
+{% endif %}
 
 <style>
 .form-control[type="file"] {

@@ -54,12 +54,20 @@
 </div>
 {% endif %}
 
+<!-- Haupt-Statistiken -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-content">
             <h3>{{ student_count }}</h3>
             <p>Sch&uuml;ler</p>
         </div>
+        {% if student_count > 0 %}
+        <div class="stat-detail">
+            <span class="stat-pill stat-pill-blue">{{ student_m }}m / {{ student_w }}w</span>
+            {% if student_ib > 0 %}<span class="stat-pill stat-pill-orange">{{ student_ib }} IB</span>{% endif %}
+            {% if student_ikl > 0 %}<span class="stat-pill stat-pill-sky">{{ student_ikl }} IKL</span>{% endif %}
+        </div>
+        {% endif %}
         <a href="{{ url_for('students') }}" class="stat-link">Verwalten &rarr;</a>
     </div>
 
@@ -68,6 +76,12 @@
             <h3>{{ wish_count }}</h3>
             <p>Elternw&uuml;nsche</p>
         </div>
+        {% if wish_count > 0 %}
+        <div class="stat-detail">
+            <span class="stat-pill stat-pill-green">{{ wish_together }} zusammen</span>
+            <span class="stat-pill stat-pill-red">{{ wish_separated }} getrennt</span>
+        </div>
+        {% endif %}
         <a href="{{ url_for('wishes') }}" class="stat-link">Verwalten &rarr;</a>
     </div>
 
@@ -76,8 +90,37 @@
             <h3>{{ assignment_count }}</h3>
             <p>Einteilungen</p>
         </div>
+        {% if latest_assignment_name %}
+        <div class="stat-detail">
+            <span class="stat-pill stat-pill-gray" style="max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Letzte: {{ latest_assignment_name }}</span>
+        </div>
+        {% endif %}
         <a href="{{ url_for('assignments') }}" class="stat-link">Ansehen &rarr;</a>
     </div>
+
+    {% if wish_rate is not none %}
+    <div class="stat-card stat-card-highlight">
+        <div class="stat-content">
+            <h3 class="wish-rate-number {% if wish_rate >= 90 %}rate-excellent{% elif wish_rate >= 70 %}rate-good{% else %}rate-warn{% endif %}">{{ wish_rate }}%</h3>
+            <p>Wunsch-Erf&uuml;llungsrate</p>
+        </div>
+        <div class="stat-detail">
+            <span class="stat-pill {% if wish_rate >= 90 %}stat-pill-green{% elif wish_rate >= 70 %}stat-pill-orange{% else %}stat-pill-red{% endif %}">{{ wish_fulfilled }} von {{ wish_total }} W&uuml;nschen</span>
+        </div>
+        <a href="{{ url_for('assignments') }}" class="stat-link">Letzte Einteilung &rarr;</a>
+    </div>
+    {% elif assignment_count == 0 and wish_count > 0 %}
+    <div class="stat-card stat-card-muted">
+        <div class="stat-content">
+            <h3 style="color:#aaa;">—</h3>
+            <p>Wunsch-Erf&uuml;llungsrate</p>
+        </div>
+        <div class="stat-detail">
+            <span class="stat-pill stat-pill-gray">Noch keine Einteilung</span>
+        </div>
+        <a href="{{ url_for('generate') }}" class="stat-link">Jetzt generieren &rarr;</a>
+    </div>
+    {% endif %}
 </div>
 
 <div class="quick-actions">
@@ -138,34 +181,16 @@
     box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
 }
 
-.wizard-banner h3 {
-    margin: 0 0 0.25rem 0;
-    font-size: 1.3rem;
-}
-
-.wizard-banner p {
-    margin: 0;
-    opacity: 0.9;
-}
-
-.wizard-banner-actions {
-    display: flex;
-    gap: 0.75rem;
-}
-
-.wizard-banner .btn {
-    white-space: nowrap;
-}
-
+.wizard-banner h3 { margin: 0 0 0.25rem 0; font-size: 1.3rem; }
+.wizard-banner p { margin: 0; opacity: 0.9; }
+.wizard-banner-actions { display: flex; gap: 0.75rem; }
+.wizard-banner .btn { white-space: nowrap; }
 .wizard-banner .btn-outline {
     background: rgba(255,255,255,0.2);
     color: white;
     border-color: rgba(255,255,255,0.4);
 }
-
-.wizard-banner .btn-outline:hover {
-    background: rgba(255,255,255,0.3);
-}
+.wizard-banner .btn-outline:hover { background: rgba(255,255,255,0.3); }
 
 .mode-selection {
     background: white;
@@ -174,13 +199,11 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     margin-bottom: 2rem;
 }
-
 .mode-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 2rem;
 }
-
 .mode-card {
     background: #f8f9fa;
     border: 3px solid #e0e0e0;
@@ -189,76 +212,61 @@
     text-align: center;
     transition: all 0.3s ease;
 }
-
-.mode-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
+.mode-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
 .wizard-mode {
     border-color: #667eea;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
 }
-
 .wizard-mode:hover {
     border-color: #667eea;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
 }
+.mode-icon { font-size: 4rem; margin-bottom: 1rem; }
+.mode-card h3 { margin-top: 0; margin-bottom: 0.75rem; font-size: 1.5rem; }
+.mode-card p { color: #666; margin-bottom: 1.5rem; line-height: 1.6; }
+.mode-features { text-align: left; list-style: none; padding: 0; margin: 1.5rem 0; }
+.mode-features li { padding: 0.5rem 0; color: #555; }
+.btn-large { padding: 0.85rem 2rem; font-size: 1.05rem; font-weight: 600; }
 
-.mode-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+/* Stat-Detail Pills */
+.stat-detail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.5rem 0 0.75rem 0;
 }
-
-.mode-card h3 {
-    margin-top: 0;
-    margin-bottom: 0.75rem;
-    font-size: 1.5rem;
-}
-
-.mode-card p {
-    color: #666;
-    margin-bottom: 1.5rem;
-    line-height: 1.6;
-}
-
-.mode-features {
-    text-align: left;
-    list-style: none;
-    padding: 0;
-    margin: 1.5rem 0;
-}
-
-.mode-features li {
-    padding: 0.5rem 0;
-    color: #555;
-}
-
-.btn-large {
-    padding: 0.85rem 2rem;
-    font-size: 1.05rem;
+.stat-pill {
+    display: inline-block;
+    font-size: 0.75rem;
     font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
 }
+.stat-pill-blue   { background: #dbeafe; color: #1d4ed8; }
+.stat-pill-orange { background: #fff3cd; color: #b45309; }
+.stat-pill-sky    { background: #e0f2fe; color: #0369a1; }
+.stat-pill-green  { background: #dcfce7; color: #15803d; }
+.stat-pill-red    { background: #fee2e2; color: #b91c1c; }
+.stat-pill-gray   { background: #f1f5f9; color: #64748b; }
+
+.stat-card-highlight {
+    border-top: 3px solid #007aff;
+}
+.stat-card-muted {
+    opacity: 0.7;
+}
+
+/* Wunsch-Rate Farben */
+.wish-rate-number { font-size: 2rem !important; }
+.rate-excellent { color: #15803d !important; }
+.rate-good      { color: #b45309 !important; }
+.rate-warn      { color: #b91c1c !important; }
 
 @media (max-width: 768px) {
-    .wizard-banner {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-    }
-
-    .wizard-banner-actions {
-        width: 100%;
-        flex-direction: column;
-    }
-
-    .wizard-banner-actions .btn {
-        width: 100%;
-    }
-
-    .mode-cards {
-        grid-template-columns: 1fr;
-    }
+    .wizard-banner { flex-direction: column; gap: 1rem; text-align: center; }
+    .wizard-banner-actions { width: 100%; flex-direction: column; }
+    .wizard-banner-actions .btn { width: 100%; }
+    .mode-cards { grid-template-columns: 1fr; }
 }
 </style>
 {% endblock %}

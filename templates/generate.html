@@ -85,13 +85,17 @@
             <div>
 
             <div>
-                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                     IB-Sch&uuml;ler Verteilung:
                     <input type="number" name="ib_min" min="0" max="20" value="{{ options.get('ib_min', 2) }}" style="width: 4rem;" class="form-control">
                     bis
                     <input type="number" name="ib_max" min="0" max="20" value="{{ options.get('ib_max', 5) }}" style="width: 4rem;" class="form-control">
                     pro Klasse
                     <span style="color: #6c757d; font-size: 0.875rem;">(0/0 = kein Limit, empfohlen: 2-5)</span>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                    Max. Klassengr&ouml;&szlig;e mit IB:
+                    <input type="number" name="ib_class_size" min="0" max="35" value="{{ options.get('ib_class_size', 22) }}" style="width: 4rem;" class="form-control">
+                    <span style="color: #6c757d; font-size: 0.875rem;">(0 = kein Limit, empfohlen: 22)</span>
                 </label>
             </div>
         </div>
@@ -153,6 +157,63 @@
     });
 </script>
 
+<!-- ══ Vorschlag-Vergleich ════════════════════════════════════════ -->
+<div class="comparison-panel">
+    <h4 class="comparison-title">&#x1F50D; Vergleich der drei Vorschl&auml;ge</h4>
+    <div class="comparison-grid">
+        {% for proposal in proposals %}
+        {% set stats = proposal.statistics %}
+        <div class="comparison-col" id="cmp-col-{{ loop.index0 }}">
+            <div class="cmp-header">Vorschlag {{ loop.index }}</div>
+
+            <!-- Wunscherfüllungsrate -->
+            {% if stats.wish_total and stats.wish_total > 0 %}
+            <div class="cmp-metric" id="cmp-wish-{{ loop.index0 }}">
+                <span class="cmp-label">&#x2764; Elternw&uuml;nsche</span>
+                <span class="cmp-value">{{ stats.wish_rate }}%
+                    <small>({{ stats.wish_fulfilled }}/{{ stats.wish_total }})</small>
+                </span>
+                <div class="cmp-bar-wrap">
+                    <div class="cmp-bar" style="width:{{ stats.wish_rate }}%; background: {% if stats.wish_rate >= 90 %}#22c55e{% elif stats.wish_rate >= 70 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="cmp-metric cmp-muted">
+                <span class="cmp-label">&#x2764; Elternw&uuml;nsche</span>
+                <span class="cmp-value" style="color:#aaa;">keine</span>
+            </div>
+            {% endif %}
+
+            <!-- Geschlechterbalance -->
+            <div class="cmp-metric" id="cmp-gender-{{ loop.index0 }}">
+                <span class="cmp-label">&#x2696; Geschlechterbalance</span>
+                <span class="cmp-value">{{ stats.gender_balance_score }}%</span>
+                <div class="cmp-bar-wrap">
+                    <div class="cmp-bar" style="width:{{ stats.gender_balance_score }}%; background: {% if stats.gender_balance_score >= 90 %}#22c55e{% elif stats.gender_balance_score >= 70 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+                </div>
+            </div>
+
+            <!-- Klassengrößen -->
+            <div class="cmp-metric">
+                <span class="cmp-label">&#x1F4CF; Klassengrößen</span>
+                <span class="cmp-value cmp-sizes">
+                    {% for cls in proposal.classes %}{{ cls.count }}{% if not loop.last %} / {% endif %}{% endfor %}
+                </span>
+            </div>
+
+            <!-- Unterschiede (via JS befüllt) -->
+            <div class="cmp-metric">
+                <span class="cmp-label">&#x21C4; Anders als andere Vorschl&auml;ge</span>
+                <span class="cmp-diff" id="cmp-diff-{{ loop.index0 }}">
+                    <span class="cmp-diff-loading">wird berechnet…</span>
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="cmp-note">&#x1F3C6; <strong>Gr&uuml;n hervorgehoben</strong> = bester Wert je Kategorie</p>
+</div>
+
 <div class="proposals-container">
     {% for proposal in proposals %}
     <div class="proposal-card">
@@ -161,6 +222,12 @@
             <div class="proposal-stats">
                 <span class="stat">{{ proposal.statistics.total_students }} Sch&uuml;ler</span>
                 <span class="stat">{{ num_classes }} Klassen</span>
+                {% if proposal.statistics.wish_rate is not none %}
+                <span class="stat stat-wish {% if proposal.statistics.wish_rate >= 90 %}stat-green{% elif proposal.statistics.wish_rate >= 70 %}stat-orange{% else %}stat-red{% endif %}">
+                    &#x2764; {{ proposal.statistics.wish_rate }}% W&uuml;nsche
+                </span>
+                {% endif %}
+                <span class="stat stat-diff-badge" id="diff-badge-{{ loop.index0 }}"></span>
             </div>
         </div>
 
@@ -237,24 +304,48 @@
                          data-schulform="{{ student.schulform or '' }}">
                         {{ student.lastname }}, {{ student.firstname }}
 
+                        {% if student.ikl %}
+                        <span class="special-badge" title="IKL-Status: Intensivklasse / Sprachf&ouml;rderung" style="background: #0ea5e9; color: #fff; font-weight: 700;">IKL</span>
+                        {% endif %}
+
                         {% if student.schulform == 'H' %}
                         <span class="special-badge" title="Hauptschule" style="background: #6c757d;">H</span>
                         {% elif student.schulform == 'R' %}
                         <span class="special-badge" title="Realschule" style="background: #0dcaf0;">R</span>
                         {% elif student.schulform == 'G' %}
                         <span class="special-badge" title="Gymnasium" style="background: #198754;">G</span>
-                        {% elif student.schulform == 'IB' %}
+                        {% elif student.schulform == 'IB' and not student.special_needs %}
                         <span class="special-badge" title="Inklusiv beschulter Sch&uuml;ler" style="background: #fd7e14; font-weight: 700;">IB</span>
                         {% endif %}
 
-                        {% if student.special_needs == 'hoerschaedigung' %}
-                        <span class="special-badge" title="H&ouml;rsch&auml;digung" style="background: #dc3545;">H</span>
-                        {% elif student.special_needs == 'sprache' %}
-                        <span class="special-badge" title="Sprache" style="background: #fd7e14;">S</span>
+                        {% if student.schulform == 'IB' and student.special_needs %}
+                        {% if student.special_needs == 'lernen' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: Lernen">IB·L</span>
                         {% elif student.special_needs == 'sozial_emotional' %}
-                        <span class="special-badge" title="Sozial/Emotional" style="background: #6f42c1;">SE</span>
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: ESE">IB·E</span>
+                        {% elif student.special_needs == 'sprache' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: Sprache">IB·Sp</span>
+                        {% elif student.special_needs == 'kme' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: K&ouml;rperlich-motorisch">IB·K</span>
+                        {% elif student.special_needs == 'sehen' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: Sehen">IB·Se</span>
+                        {% elif student.special_needs == 'hoerschaedigung' %}
+                        <span class="special-badge ib-focus-badge" title="IB-Schwerpunkt: H&ouml;ren">IB·H</span>
+                        {% else %}
+                        <span class="special-badge ib-focus-badge" title="IB">IB</span>
+                        {% endif %}
+                        {% elif student.special_needs == 'hoerschaedigung' %}
+                        <span class="special-badge" title="H&ouml;ren" style="background: #dc3545;">H</span>
+                        {% elif student.special_needs == 'sprache' %}
+                        <span class="special-badge" title="Sprache" style="background: #fd7e14;">Sp</span>
+                        {% elif student.special_needs == 'sozial_emotional' %}
+                        <span class="special-badge" title="ESE" style="background: #6f42c1;">E</span>
                         {% elif student.special_needs == 'lernen' %}
                         <span class="special-badge" title="Lernen" style="background: #0d6efd;">L</span>
+                        {% elif student.special_needs == 'sehen' %}
+                        <span class="special-badge" title="Sehen" style="background: #20c997;">Se</span>
+                        {% elif student.special_needs == 'kme' %}
+                        <span class="special-badge" title="K&ouml;rperlich-motorisch" style="background: #6c757d;">K</span>
                         {% elif student.special_needs %}
                         <span class="special-badge" title="{{ student.special_needs }}">!</span>
                         {% endif %}
@@ -293,6 +384,7 @@
                 <input type="hidden" name="proposal_index" value="{{ loop.index0 }}">
                 <button type="submit" class="btn btn-primary">Ausw&auml;hlen</button>
             </form>
+            <a href="{{ url_for('generate_transparency', proposal_idx=loop.index0) }}" class="btn btn-secondary">Transparenz</a>
         </div>
     </div>
     {% endfor %}
@@ -315,5 +407,203 @@
     </ul>
 </div>
 
+<script>
+// ── Schüler-Differenzen zwischen Vorschlägen berechnen ──────────
+(function() {
+    // Proposals als JS-Objekt aufbauen: proposal_idx → {student_id: class_number}
+    const maps = [
+        {% for proposal in proposals %}
+        { {% for sid, cls_num in proposal.statistics.student_class_map.items() %}"{{ sid }}": {{ cls_num }},{% endfor %} }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const n = maps.length;
+
+    for (let i = 0; i < n; i++) {
+        const others = maps.filter((_, j) => j !== i);
+        let diffCount = 0;
+        const diffStudentIds = new Set();
+
+        for (const [sid, cls] of Object.entries(maps[i])) {
+            // Schüler gilt als "anders", wenn er in mind. einem anderen Vorschlag anders eingeteilt ist
+            const anyDiff = others.some(m => m[sid] !== undefined && m[sid] !== cls);
+            if (anyDiff) {
+                diffCount++;
+                diffStudentIds.add(sid);
+            }
+        }
+
+        const total = Object.keys(maps[i]).length;
+        const sameCount = total - diffCount;
+
+        // Vergleichspanel befüllen
+        const diffEl = document.getElementById('cmp-diff-' + i);
+        if (diffEl) {
+            if (diffCount === 0) {
+                diffEl.innerHTML = '<span style="color:#22c55e; font-weight:600;">identisch mit anderen</span>';
+            } else {
+                diffEl.innerHTML =
+                    '<span class="diff-pill diff-changed">' + diffCount + ' anders</span>' +
+                    '<span class="diff-pill diff-same">' + sameCount + ' gleich</span>';
+            }
+        }
+
+        // Badge im Proposal-Header befüllen
+        const badgeEl = document.getElementById('diff-badge-' + i);
+        if (badgeEl && diffCount > 0) {
+            badgeEl.innerHTML = '<span style="background:#6366f1;color:white;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.78rem;font-weight:600;">' + diffCount + ' Sch&uuml;ler anders eingeteilt</span>';
+        }
+
+        // Schüler-Items farbig markieren die sich unterscheiden
+        const proposal = document.querySelectorAll('.proposal-card')[i];
+        if (proposal) {
+            proposal.querySelectorAll('.student-item').forEach(el => {
+                const sid = el.dataset.studentId;
+                if (diffStudentIds.has(sid)) {
+                    el.classList.add('student-differs');
+                }
+            });
+        }
+    }
+
+    // Besten Wert je Kategorie grün hervorheben (Wunscherfüllungsrate)
+    highlightBest('cmp-wish-', {{ proposals|length }}, true);
+    highlightBest('cmp-gender-', {{ proposals|length }}, true);
+
+    function highlightBest(prefix, count, higher_is_better) {
+        const els = [];
+        for (let i = 0; i < count; i++) {
+            const el = document.getElementById(prefix + i);
+            if (el) {
+                const valEl = el.querySelector('.cmp-value');
+                const val = valEl ? parseFloat(valEl.textContent) : null;
+                els.push({ el, val });
+            }
+        }
+        const vals = els.map(e => e.val).filter(v => v !== null && !isNaN(v));
+        if (vals.length === 0) return;
+        const best = higher_is_better ? Math.max(...vals) : Math.min(...vals);
+        // Nur als beste markieren wenn nicht alle gleich sind
+        if (vals.every(v => v === best)) return;
+        els.forEach(({ el, val }) => {
+            if (val === best) el.classList.add('cmp-best');
+        });
+    }
+})();
+</script>
+
+<style>
+/* ── Vergleichs-Panel ──────────────────────────────────────────── */
+.comparison-panel {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.comparison-title {
+    margin: 0 0 1.25rem 0;
+    font-size: 1.05rem;
+    color: #374151;
+}
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+@media (max-width: 700px) {
+    .comparison-grid { grid-template-columns: 1fr; }
+}
+.comparison-col {
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 1rem;
+    transition: border-color 0.2s;
+}
+.cmp-header {
+    font-weight: 700;
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+    color: #1d4ed8;
+}
+.cmp-metric {
+    margin-bottom: 0.75rem;
+}
+.cmp-metric.cmp-muted { opacity: 0.5; }
+.cmp-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+}
+.cmp-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #111827;
+}
+.cmp-value small { font-weight: 400; color: #6b7280; font-size: 0.8rem; }
+.cmp-sizes { font-size: 0.9rem; color: #374151; }
+.cmp-bar-wrap {
+    height: 6px;
+    background: #f3f4f6;
+    border-radius: 3px;
+    margin-top: 0.3rem;
+    overflow: hidden;
+}
+.cmp-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+.cmp-diff { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
+.cmp-diff-loading { color: #9ca3af; font-size: 0.8rem; font-style: italic; }
+.diff-pill {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.diff-changed { background: #fef3c7; color: #92400e; }
+.diff-same    { background: #d1fae5; color: #065f46; }
+
+/* Bester Wert grün markieren */
+.cmp-best {
+    border-color: #22c55e !important;
+    background: #f0fdf4;
+}
+.cmp-best .cmp-header { color: #15803d; }
+
+.cmp-note {
+    margin: 1rem 0 0 0;
+    font-size: 0.82rem;
+    color: #6b7280;
+}
+
+/* Schüler die sich zwischen Vorschlägen unterscheiden */
+.student-item.student-differs {
+    background: #fffbeb !important;
+    border-left: 3px solid #f59e0b !important;
+    padding-left: 0.5rem !important;
+    border-radius: 3px;
+}
+.student-item.student-differs::after {
+    content: ' ↕';
+    font-size: 0.7rem;
+    color: #d97706;
+    font-weight: 700;
+}
+
+/* Wunsch-Rate Badge im Proposal-Header */
+.stat-wish { font-weight: 700; }
+.stat-green { color: #15803d; }
+.stat-orange { color: #b45309; }
+.stat-red { color: #b91c1c; }
+</style>
 <script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
 {% endblock %}
