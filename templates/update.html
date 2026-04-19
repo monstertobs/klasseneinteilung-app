@@ -73,10 +73,14 @@
         Nach dem Update muss die App neu gestartet werden.
     </div>
 
+    {% if session.is_admin %}
     <form method="POST" action="{{ url_for('apply_update') }}" onsubmit="return confirm('Update auf Version {{ github_version }} installieren? Die App muss danach neu gestartet werden.')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-primary">⬇️ Update {{ github_version }} installieren</button>
     </form>
+    {% else %}
+    <p style="color: #555; font-size: 0.92rem;">Nur der Administrator kann Updates installieren.</p>
+    {% endif %}
 </div>
 
 {% elif github_version and not error %}
@@ -93,10 +97,14 @@
         Ein Backup der vorherigen Version ist vorhanden. Falls nach einem Update Probleme auftreten,
         kann die vorherige Version wiederhergestellt werden. Die App muss danach neu gestartet werden.
     </p>
+    {% if session.is_admin %}
     <form method="POST" action="{{ url_for('rollback_update') }}" onsubmit="return confirm('Zur vorherigen Version zurückkehren? Die App muss danach neu gestartet werden.')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-secondary" style="border-color: #dc3545; color: #dc3545;">Rollback — Vorherige Version wiederherstellen</button>
     </form>
+    {% else %}
+    <p style="color: #555; font-size: 0.92rem;">Nur der Administrator kann einen Rollback durchführen.</p>
+    {% endif %}
 </div>
 {% endif %}
 

@@ -23,7 +23,7 @@
                 <li><a href="{{ url_for('wishes') }}" {% if request.endpoint in ['wishes', 'add_wish'] %}class="active"{% endif %}>Elternw&uuml;nsche</a></li>
                 <li><a href="{{ url_for('generate') }}" {% if request.endpoint == 'generate' %}class="active"{% endif %}>Einteilung</a></li>
                 {% if session.is_admin %}<li><a href="{{ url_for('users') }}" {% if request.endpoint in ['users', 'add_user'] %}class="active"{% endif %}>Benutzer</a></li>{% endif %}
-                {% if session.is_admin %}<li><a href="{{ url_for('check_update') }}" {% if request.endpoint in ['check_update', 'apply_update', 'rollback_update'] %}class="active"{% endif %}>Update</a></li>{% endif %}
+                <li><a href="{{ url_for('check_update') }}" {% if request.endpoint in ['check_update', 'apply_update', 'rollback_update'] %}class="active"{% endif %}>Update</a></li>
                 <li><a href="{{ url_for('algorithm') }}" {% if request.endpoint == 'algorithm' %}class="active"{% endif %}>Algorithmus</a></li>
                 <li><a href="{{ url_for('about') }}" {% if request.endpoint == 'about' %}class="active"{% endif %}>&Uuml;ber</a></li>
                 <li><a href="{{ url_for('change_password') }}" {% if request.endpoint == 'change_password' %}class="active"{% endif %}>Passwort</a></li>
@@ -155,7 +155,7 @@
             <p>
                 &copy; 2026 Tobias Meier &middot;
                 <a href="mailto:admin(at)secutobs.com" style="color: inherit; text-decoration: none;">admin(at)secutobs.com</a> &middot;
-                Klasseneinteilung v0.1.26 &middot;
+                Klasseneinteilung v0.1.27 &middot;
                 DSGVO-konform &middot;
                 Lokale Datenspeicherung
             </p>

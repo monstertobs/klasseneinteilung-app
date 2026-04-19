@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.27 - Update-Seite für alle Benutzer sichtbar
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserungen
+- **Update-Seite:** Alle eingeloggten Benutzer können die Update-Seite öffnen und prüfen ob eine neue Version verfügbar ist
+- **Install/Rollback:** Weiterhin nur für Admin sichtbar und ausführbar
+
+---
+
 ## Version 0.1.26 - Security Hardening
 **Release Date:** 19. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -431,5 +442,5 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Last Updated:** 19. April 2026
-**Current Version:** 0.1.26
+**Current Version:** 0.1.27
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>
