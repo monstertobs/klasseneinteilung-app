@@ -2,7 +2,7 @@
 
 **Intelligente Klasseneinteilung für 5. Klassen**
 
-![Version](https://img.shields.io/badge/version-0.1.24-blue)
+![Version](https://img.shields.io/badge/version-0.1.26-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-green)
 ![Flask](https://img.shields.io/badge/flask-3.x-lightgrey)
 ![License](https://img.shields.io/badge/lizenz-MIT-brightgreen)

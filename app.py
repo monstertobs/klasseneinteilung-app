@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.25
+Version: 0.1.26
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.25'
+__version__ = '0.1.26'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -134,9 +134,13 @@ def check_idle_timeout():
 # Response-Header für UTF-8 Encoding setzen
 @app.after_request
 def after_request(response):
-    """Setzt UTF-8 Encoding für alle Responses"""
+    """Setzt UTF-8 Encoding und Security-Header für alle Responses"""
     if response.content_type and 'text/html' in response.content_type:
         response.content_type = 'text/html; charset=utf-8'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
 DATABASE = 'klasseneinteilung.db'
@@ -319,6 +323,7 @@ def index():
     return redirect(url_for('login'))
 
 @app.route('/version')
+@login_required
 def version():
     """Version und Autor-Informationen anzeigen"""
     return jsonify({
@@ -1337,7 +1342,7 @@ def delete_testdata():
     placeholders = ','.join('?' * len(ids))
     cursor.execute(f'DELETE FROM parent_wishes WHERE student_id IN ({placeholders})', ids)
     cursor.execute(f'DELETE FROM parent_wishes WHERE related_student_id IN ({placeholders})', ids)
-    cursor.execute(f"DELETE FROM students WHERE import_batch_id LIKE 'TESTDATA-%'")
+    cursor.execute("DELETE FROM students WHERE import_batch_id LIKE ?", ('TESTDATA-%',))
     db.commit()
     db.close()
 
@@ -2407,7 +2412,7 @@ def check_update():
     try:
         raw = _fetch_github_text(f'{GITHUB_RAW_BASE}/app.py')
         m = re.search(r"__version__\s*=\s*'([^']+)'", raw)
-        if m:
+        if m and re.match(r'^\d+\.\d+\.\d+$', m.group(1)):
             github_version = m.group(1)
         else:
             error = 'Konnte Version nicht aus GitHub lesen.'
@@ -2437,6 +2442,7 @@ def check_update():
 
 @app.route('/admin/update/apply', methods=['POST'])
 @admin_required
+@limiter.limit("5 per hour")
 def apply_update():
     """Lädt die neueste Version von GitHub herunter und installiert sie."""
     import urllib.request, zipfile, shutil
@@ -2517,6 +2523,7 @@ def apply_update():
 
 @app.route('/admin/update/rollback', methods=['POST'])
 @admin_required
+@limiter.limit("5 per hour")
 def rollback_update():
     """Stellt die gesicherte Version manuell wieder her."""
     try:
@@ -3587,4 +3594,4 @@ if __name__ == '__main__':
     init_db()
 
     # App starten
-    app.run(debug=True, host='0.0.0.0', port=5050)
+    app.run(debug=(os.environ.get('FLASK_ENV') == 'development'), host='0.0.0.0', port=5050)

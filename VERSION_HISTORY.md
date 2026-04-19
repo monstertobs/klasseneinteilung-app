@@ -6,6 +6,21 @@
 
 ---
 
+## Version 0.1.26 - Security Hardening
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Sicherheits-Verbesserungen
+- **Debug-Modus deaktiviert:** `debug=True` → nur noch aktiv wenn `FLASK_ENV=development` gesetzt ist (verhindert Werkzeug-Debugger im Produktivbetrieb)
+- **Security-Header:** Alle HTTP-Antworten enthalten jetzt `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection`, `Referrer-Policy`
+- **Version-Endpoint geschützt:** `/version` erfordert jetzt Login
+- **GitHub-Versionsstring validiert:** Format wird auf `x.y.z` geprüft bevor er verarbeitet wird
+- **Rate-Limiting auf Update-Routen:** `apply_update` und `rollback_update` auf max. 5 Aufrufe/Stunde begrenzt
+- **SQL-Query bereinigt:** Unnötiger f-String in DELETE-Query entfernt, stattdessen saubere Parametrisierung
+
+---
+
 ## Version 0.1.25 - Breitere Darstellung (max-width 1600px)
 **Release Date:** 19. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -416,5 +431,5 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Last Updated:** 19. April 2026
-**Current Version:** 0.1.25
+**Current Version:** 0.1.26
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>
