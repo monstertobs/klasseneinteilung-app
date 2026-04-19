@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.28 - Auto-Restart nach Update + Berechtigungs-Fix
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserungen
+- **Auto-Restart:** Nach erfolgreichem Update wird gunicorn automatisch via SIGHUP neu geladen (kein manueller Neustart mehr nötig auf dem Server)
+- **Portable App:** Fallback-Hinweis für PORTABLE-START.bat bleibt erhalten wenn SIGHUP nicht verfügbar
+
+---
+
 ## Version 0.1.27 - Update-Seite für alle Benutzer sichtbar
 **Release Date:** 19. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -442,5 +453,5 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Last Updated:** 19. April 2026
-**Current Version:** 0.1.27
+**Current Version:** 0.1.28
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>
