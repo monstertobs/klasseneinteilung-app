@@ -6,6 +6,16 @@
 
 ---
 
+## Version 0.1.29 - Auto-Restart Fix (Delay vor SIGHUP)
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Bugfix
+- **Auto-Restart:** SIGHUP wird jetzt mit 2 Sekunden Verzögerung in einem Background-Thread gesendet, damit die HTTP-Antwort zuerst zum Browser zurückgesendet wird bevor gunicorn die Worker neu startet
+
+---
+
 ## Version 0.1.28 - Auto-Restart nach Update + Berechtigungs-Fix
 **Release Date:** 19. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -453,5 +463,5 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Last Updated:** 19. April 2026
-**Current Version:** 0.1.28
+**Current Version:** 0.1.29
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>

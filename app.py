@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.28
+Version: 0.1.29
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.28'
+__version__ = '0.1.29'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2509,19 +2509,17 @@ def apply_update():
                     with zf.open(member) as src_f, open(dest, 'wb') as dst_f:
                         dst_f.write(src_f.read())
 
-        # Neustart: Gunicorn (Server) via SIGHUP graceful reload, sonst Hinweis für portable App
-        restarted = False
+        # Neustart: SIGHUP mit 2s Delay damit HTTP-Antwort zuerst gesendet wird
         try:
-            import signal as _signal
+            import signal as _signal, threading
             master_pid = os.getppid()
-            os.kill(master_pid, _signal.SIGHUP)
-            restarted = True
+            def _delayed_sighup():
+                import time; time.sleep(2)
+                try: os.kill(master_pid, _signal.SIGHUP)
+                except Exception: pass
+            threading.Thread(target=_delayed_sighup, daemon=True).start()
+            flash('✅ Update erfolgreich installiert! Die App startet in wenigen Sekunden automatisch neu.', 'success')
         except Exception:
-            pass
-
-        if restarted:
-            flash('✅ Update erfolgreich installiert! Die App lädt automatisch neu.', 'success')
-        else:
             flash('✅ Update erfolgreich installiert! Bitte starte die App neu (Fenster schließen → PORTABLE-START.bat).', 'success')
     except Exception as e:
         # Automatischer Rollback
