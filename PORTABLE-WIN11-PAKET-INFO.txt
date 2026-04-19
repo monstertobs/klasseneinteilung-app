@@ -6,8 +6,8 @@
 📦 PAKET-DETAILS:
 ──────────────────────────────────────────────────────────────────────────
   Paket-Name:      klasseneinteilung-app-PORTABLE-WIN11.zip
-  Version:         0.1.17 - Import Validation Edition
-  Release Date:    8. Maerz 2026
+  Version:         0.1.25 - Import Validation Edition
+  Release Date:    19. April 2026
   Paket-Typ:       Portable (kein Installer)
   Zielplattform:   Windows 11 (funktioniert auch auf Windows 10)
 
@@ -36,6 +36,7 @@
 
   Python-Pakete:
     • Flask 3.0.0                   - Web-Framework
+    • Flask-Login 0.6.3            - Authentifizierung
     • Flask-WTF 1.2.1              - CSRF-Schutz
     • Flask-Session 0.8.0          - Session-Management
     • Flask-Limiter 3.5.0          - Rate Limiting
@@ -151,7 +152,7 @@
 ──────────────────────────────────────────────────────────────────────────
   Autor:    Tobias Meier
   Email:    admin(at)secutobs.com
-  Version:  0.1.17 - Import Validation Edition
+  Version:  0.1.25 - Import Validation Edition
 
 
 📄 LIZENZ:

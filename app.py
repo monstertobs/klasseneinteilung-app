@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.17
+Version: 0.1.25
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 26. Februar 2026
+Date: 19. April 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,9 +23,14 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.17'
+__version__ = '0.1.25'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
+
+# GitHub Update-Konfiguration
+GITHUB_REPO = 'monstertobs/klasseneinteilung-app'
+GITHUB_RAW_BASE = f'https://raw.githubusercontent.com/{GITHUB_REPO}/main'
+GITHUB_ZIP_URL = f'https://github.com/{GITHUB_REPO}/archive/refs/heads/main.zip'
 
 # Konstanten
 MAX_CLASS_SIZE = 25  # Maximale Anzahl Schüler pro Klasse
@@ -692,6 +697,7 @@ def process_import_data(data, batch_id):
         'schulform': ['schulform', 'schule', 'school_type', 'bildungsgang', 'eignung'],
         'religion': ['religion', 'konfession', 'wahlfach religion'],
         'sportlich': ['sportlich', 'sport', 'athletic', 'sporty', 'sportklasse'],
+        'sport_interesse': ['sportklasse'],  # Sportklassen-Hacken = Schüler soll in Sportklasse
         'special_needs': ['förderbedarf', 'foerderbedarf', 'special_needs', 'special needs', 'sonderpädagogik'],
         'notes': ['notizen', 'notes', 'bemerkungen', 'anmerkungen', 'infos übergabe', 'infos uebergabe', 'sonstige / einwände', 'sonstige / einwaende', 'sonstige']
     }
@@ -753,10 +759,14 @@ def process_import_data(data, batch_id):
                                 row_warnings.append(f'Schulform "{str(value).strip()}" nicht erkannt — erwartet: H / R / G / IB')
                         elif db_field == 'religion':
                             rel_val = str(value).strip().lower()
-                            known_religions = {'ethik', 'katholisch', 'evangelisch', 'leer'}
-                            student_data['religion'] = str(value).strip()
-                            if rel_val not in known_religions:
-                                row_warnings.append(f'Religion "{str(value).strip()}" nicht erkannt — erwartet: ethik / katholisch / evangelisch')
+                            if rel_val in ('katholisch', 'kath', 'rk', 'röm.-kath.', 'römisch-katholisch'):
+                                student_data['religion'] = 'katholisch'
+                            elif rel_val in ('evangelisch', 'ev', 'evang.', 'protestant', 'evangelisch-lutherisch'):
+                                student_data['religion'] = 'evangelisch'
+                            else:
+                                student_data['religion'] = 'ethik'
+                                if rel_val not in ('ethik', 'leer', ''):
+                                    row_warnings.append(f'Religion "{str(value).strip()}" nicht erkannt — wird auf "Ethik" gesetzt')
                         elif db_field == 'sportlich':
                             sportlich_values = ['ja', 'yes', '1', 'true', 'x']
                             nein_values = ['nein', 'no', '0', 'false', '-', '']
@@ -768,6 +778,10 @@ def process_import_data(data, batch_id):
                             else:
                                 student_data['sportlich'] = 0
                                 row_warnings.append(f'Sportlich "{str(value).strip()}" nicht erkannt — erwartet: ja / nein')
+                        elif db_field == 'sport_interesse':
+                            sportlich_values = ['ja', 'yes', '1', 'true', 'x']
+                            val_low = str(value).lower().strip()
+                            student_data['sport_interesse'] = 1 if val_low in sportlich_values else 0
                         elif db_field == 'special_needs':
                             sn_val = str(value).strip().lower()
                             known_sn = {'hoerschaedigung', 'sprache', 'sozial_emotional', 'lernen', 'sehen', 'kme'}
@@ -804,6 +818,26 @@ def process_import_data(data, batch_id):
             if notes_parts:
                 student_data['notes'] = ' | '.join(notes_parts)
 
+            # Eignung hat Vorrang: R oder H aus "Eignung"-Spalte überschreibt alles andere
+            # (Elternwunsch Gymnasium z.B. in "Infos Übergabe" ändert die Schulform nicht)
+            eignung_raw = row_lower.get('eignung', '')
+            if eignung_raw:
+                schulform_map_local = {'h': 'H', 'hauptschule': 'H', 'hs': 'H',
+                                       'r': 'R', 'realschule': 'R', 'rs': 'R',
+                                       'g': 'G', 'gymnasium': 'G', 'gym': 'G',
+                                       'ib': 'IB'}
+                eignung_mapped = schulform_map_local.get(str(eignung_raw).strip().lower())
+                if eignung_mapped in ('R', 'H'):
+                    current = student_data.get('schulform', '')
+                    if current and current != eignung_mapped:
+                        # Prüfen ob "Infos Übergabe" Gymnasium erwähnt
+                        infos_raw = str(row_lower.get('infos übergabe', '') or row_lower.get('infos uebergabe', '')).lower()
+                        if 'gymnasium' in infos_raw or ' g ' in f' {infos_raw} ':
+                            row_warnings.append(f'Elternwunsch Gymnasium erkannt, aber Eignung ist {eignung_mapped} — Schüler bleibt bei {eignung_mapped}')
+                        else:
+                            row_warnings.append(f'Schulform "{current}" durch Eignung "{eignung_mapped}" überschrieben')
+                    student_data['schulform'] = eignung_mapped
+
             # Pflichtfelder prüfen
             if not firstname or not lastname:
                 partial = f"{firstname or ''} {lastname or ''}".strip() or '—'
@@ -827,8 +861,8 @@ def process_import_data(data, batch_id):
 
             # In Datenbank einfügen (trotz Duplikat, wird später überprüft)
             cursor.execute('''
-                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, special_needs, notes, created_by, import_batch_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, sport_interesse, special_needs, notes, created_by, import_batch_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 firstname,
                 lastname,
@@ -837,6 +871,7 @@ def process_import_data(data, batch_id):
                 student_data.get('schulform', ''),
                 student_data.get('religion', ''),
                 student_data.get('sportlich', 0),
+                student_data.get('sport_interesse', 0),
                 student_data.get('special_needs', ''),
                 student_data.get('notes', ''),
                 session['user_id'],
@@ -1431,6 +1466,10 @@ def generate():
     cursor.execute('SELECT * FROM parent_wishes')
     wishes = cursor.fetchall()
 
+    # Gespeicherte Einteilungen für Basis-Auswahl laden
+    cursor.execute('SELECT id, name, created_at FROM class_assignments ORDER BY created_at DESC')
+    existing_assignments = cursor.fetchall()
+
     db.close()
 
     if len(students) == 0:
@@ -1505,10 +1544,23 @@ def generate():
             'ib_class_size': 22,
         }
 
+    # Basis-Einteilung laden (falls angegeben)
+    base_assignment = None
+    base_assignment_id = request.form.get('base_assignment_id', '') if request.method == 'POST' else ''
+    if base_assignment_id:
+        try:
+            db2 = get_db()
+            row = db2.execute('SELECT data FROM class_assignments WHERE id = ?', (int(base_assignment_id),)).fetchone()
+            db2.close()
+            if row:
+                base_assignment = json.loads(row['data'])
+        except Exception:
+            pass
+
     # 3 verschiedene Einteilungen generieren
     proposals = []
     for i in range(3):
-        proposal = generate_class_assignment(students, wishes, num_classes, i, options)
+        proposal = generate_class_assignment(students, wishes, num_classes, i, options, base_assignment=base_assignment)
         proposals.append(proposal)
 
     # ── Vergleichsmetriken pro Vorschlag berechnen ────────────────
@@ -1561,7 +1613,9 @@ def generate():
     # Proposals in Session speichern für Export
     session['last_proposals'] = proposals
 
-    return render_template('generate.html', proposals=proposals, num_classes=num_classes, options=options)
+    return render_template('generate.html', proposals=proposals, num_classes=num_classes, options=options,
+                           existing_assignments=existing_assignments, selected_base_id=base_assignment_id,
+                           wish_count=len(wishes))
 
 def extract_city_from_wohnort(wohnort):
     """Extrahiere Stadt (PLZ + Stadtname) aus vollständiger Adresse"""
@@ -1587,16 +1641,19 @@ def extract_plz_from_wohnort(wohnort):
         return match.group(1)
     return None
 
-def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None):
+def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, pinned_student_ids=None):
     """
     Post-Processing: Verbessert Wunsch-Erfüllungsrate durch iterativen Schüler-Tausch.
     - Tauscht bevorzugt gleichgeschlechtliche Schüler (Geschlechterbalance bleibt erhalten)
     - Verschiebt Schüler wenn Zielklasse noch Platz hat
     - Wiederholt bis keine Verbesserung mehr möglich (max. max_rounds Durchläufe)
+    - Gepinnte Schüler (aus Basis-Einteilung) werden nicht bewegt
     """
     num_classes = len(classes)
     if options is None:
         options = {}
+    if pinned_student_ids is None:
+        pinned_student_ids = set()
     ib_min = options.get('ib_min', 0)
     ib_max = options.get('ib_max', 0)
 
@@ -1665,6 +1722,8 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None):
                 s_obj = all_students.get(sid)
                 if not s_obj:
                     continue
+                if sid in pinned_student_ids:
+                    continue
                 gender = s_obj.get('gender', '')
 
                 # Option 1: Verschiebe sid nach class_b wenn Platz vorhanden
@@ -1683,6 +1742,8 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None):
                 # Option 2: Tausche sid mit gleichgeschlechtlichem Schüler aus class_b
                 for candidate in list(classes[class_b]):
                     if candidate['id'] == rid:
+                        continue
+                    if candidate['id'] in pinned_student_ids:
                         continue
                     if candidate.get('gender', '') != gender:
                         continue
@@ -1729,6 +1790,8 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None):
                     s_obj = all_students.get(sid)
                     if not s_obj:
                         continue
+                    if sid in pinned_student_ids:
+                        continue
                     class_a = student_to_class[sid]
 
                     for target in range(num_classes):
@@ -1760,7 +1823,7 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None):
     return current_score
 
 
-def generate_class_assignment(students, wishes, num_classes, seed, options):
+def generate_class_assignment(students, wishes, num_classes, seed, options, base_assignment=None):
     """Intelligente Klasseneinteilung generieren"""
     random.seed(seed)
 
@@ -1827,6 +1890,48 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
     # IB-Zähler pro Klasse
     ib_count = [0 for _ in range(num_classes)]
 
+    # Basis-Einteilung: bestehende Schüler vorplatzieren, nur neue verteilen
+    pinned_student_ids = set()
+    if base_assignment:
+        base_classes = base_assignment.get('classes', [])
+        base_student_class = {}
+        for cls in base_classes:
+            cls_idx = cls['number'] - 1  # number ist 1-basiert → 0-basiert
+            for s in cls.get('students', []):
+                base_student_class[s['id']] = cls_idx
+
+        remaining = []
+        for student in student_list:
+            cls_idx = base_student_class.get(student['id'])
+            if cls_idx is not None and 0 <= cls_idx < num_classes:
+                classes[cls_idx].append(student)
+                pinned_student_ids.add(student['id'])
+                g = student.get('gender', 'm')
+                if g in gender_count[cls_idx]:
+                    gender_count[cls_idx][g] += 1
+                wohnort = student.get('wohnort', '').strip()
+                if wohnort:
+                    wohnort_count[cls_idx][wohnort] = wohnort_count[cls_idx].get(wohnort, 0) + 1
+                    city = extract_city_from_wohnort(wohnort)
+                    if city:
+                        city_count[cls_idx][city] = city_count[cls_idx].get(city, 0) + 1
+                    plz = extract_plz_from_wohnort(wohnort)
+                    if plz:
+                        plz_count[cls_idx][plz] = plz_count[cls_idx].get(plz, 0) + 1
+                sf = student.get('schulform', '').strip()
+                if sf and sf in schulform_count[cls_idx]:
+                    schulform_count[cls_idx][sf] += 1
+                if sf == 'IB':
+                    ib_count[cls_idx] += 1
+                rel = student.get('religion', '') or ''
+                if rel in religion_count[cls_idx]:
+                    religion_count[cls_idx][rel] += 1
+                if student.get('special_needs', ''):
+                    inklusion_count[cls_idx] += 1
+            else:
+                remaining.append(student)
+        student_list = remaining
+
     # Wünsche als Dictionary organisieren
     wish_dict = {}
     for wish in wishes:
@@ -1877,9 +1982,17 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
         num_ib = len(ib_students_pre)
         num_ib_classes = min(num_classes, num_ib // ib_min) if ib_min > 0 else num_classes
 
+        sport_class_indices = {ci for ci, t in specialized_mapping.items() if t == 'sport'}
+
         if num_ib_classes > 0:
             for idx, student in enumerate(ib_students_pre):
                 target_class = idx % num_ib_classes
+                # IB ohne Sportklassen-Hacken nicht in Sportklassen einteilen
+                if not student.get('sport_interesse') and target_class in sport_class_indices:
+                    for alt in range(num_ib_classes):
+                        if alt not in sport_class_indices and ib_count[alt] < ib_max:
+                            target_class = alt
+                            break
                 # Falls Maximum erreicht, nächste Klasse mit Platz suchen
                 if ib_count[target_class] >= ib_max:
                     for alt in range(num_ib_classes):
@@ -1966,7 +2079,7 @@ def generate_class_assignment(students, wishes, num_classes, seed, options):
             ib_count[best_class] += 1
 
     # Post-Processing: Wunsch-Erfüllungsrate durch iterativen Tausch verbessern
-    optimize_assignment_wishes(classes, wish_dict, options=options)
+    optimize_assignment_wishes(classes, wish_dict, options=options, pinned_student_ids=pinned_student_ids)
 
     # Statistiken nach Optimierung neu berechnen (Klassen-Zusammensetzung hat sich geändert)
     gender_count = [{'m': 0, 'w': 0} for _ in range(num_classes)]
@@ -2088,9 +2201,11 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
             # Nur für Sport-Klassen (Custom hat kein Interesse-Feld)
             if special_type == 'sport':
                 if student.get('sport_interesse'):
-                    score += 50  # Starker Bonus für passendes Interesse
+                    score += 50  # Starker Bonus: Sportklassen-Hacken
+                elif is_ib_student:
+                    score -= 5000  # Harte Sperre: IB ohne Sportklassen-Hacken nie in Sportklasse
                 else:
-                    score -= 20  # Strafe wenn Schüler kein Interesse hat
+                    score -= 200  # Starke Strafe: kein Hacken → möglichst nicht in Sportklasse
 
         # Wenn Schüler Sport-Interesse hat aber nicht in Sport-Spezialklasse
         if student.get('sport_interesse'):
@@ -2203,7 +2318,7 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                 if wish_type == 'together' and related_in_class:
                     score += 150   # Sehr hoher Bonus: "mit Freund/in zusammen"
                 elif wish_type == 'separated' and related_in_class:
-                    score -= 500   # Sehr hohe Strafe: "auf keinen Fall zusammen"
+                    score -= 5000  # Harte Sperre: "Auf keinen Fall mit" (quasi unüberwindbar)
 
             # Rückwärts-Wünsche: Schüler X hat Wunsch über diesen Schüler
             # (wichtig wenn X bereits platziert wurde, bevor dieser Schüler drankommt)
@@ -2221,6 +2336,196 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
     # Klasse mit höchstem Score auswählen
     best_class = scores.index(max(scores))
     return best_class
+
+# ─────────────────────────────────────────────────────────────
+# Update-System
+# ─────────────────────────────────────────────────────────────
+
+def _version_tuple(v):
+    try:
+        return tuple(int(x) for x in str(v).strip().split('.'))
+    except Exception:
+        return (0, 0, 0)
+
+def _get_update_backup_dir():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'update_backup')
+
+def _do_rollback():
+    """Stellt die letzte gesicherte Version wieder her."""
+    import shutil
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    backup_dir = _get_update_backup_dir()
+    if not os.path.exists(backup_dir):
+        raise FileNotFoundError('Kein Backup vorhanden.')
+    for item in os.listdir(backup_dir):
+        src = os.path.join(backup_dir, item)
+        dst = os.path.join(app_dir, item)
+        if os.path.isdir(src):
+            if os.path.exists(dst):
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+
+def _fetch_github_text(url, timeout=15):
+    import urllib.request
+    req = urllib.request.Request(url, headers={'User-Agent': 'KlasseneinteilungApp-Updater/1.0'})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode('utf-8', errors='replace')
+
+def _parse_new_changelog(changelog_text, current_ver):
+    """Gibt nur die Abschnitte zurück, die neuer als current_ver sind."""
+    sections = []
+    current_section = []
+    in_new_section = False
+    for line in changelog_text.splitlines():
+        if line.startswith('## Version '):
+            if current_section and in_new_section:
+                sections.append('\n'.join(current_section))
+            current_section = [line]
+            m = re.search(r'## Version (\S+)', line)
+            if m:
+                in_new_section = _version_tuple(m.group(1)) > _version_tuple(current_ver)
+            else:
+                in_new_section = False
+        else:
+            if current_section:
+                current_section.append(line)
+    if current_section and in_new_section:
+        sections.append('\n'.join(current_section))
+    return sections
+
+
+@app.route('/admin/update')
+@admin_required
+def check_update():
+    """Update-Seite: prüft ob eine neuere Version auf GitHub verfügbar ist."""
+    github_version = None
+    new_sections = []
+    error = None
+
+    try:
+        raw = _fetch_github_text(f'{GITHUB_RAW_BASE}/app.py')
+        m = re.search(r"__version__\s*=\s*'([^']+)'", raw)
+        if m:
+            github_version = m.group(1)
+        else:
+            error = 'Konnte Version nicht aus GitHub lesen.'
+    except Exception as e:
+        error = f'GitHub nicht erreichbar: {e}'
+
+    update_available = (github_version is not None and
+                        _version_tuple(github_version) > _version_tuple(__version__))
+
+    if update_available:
+        try:
+            changelog_raw = _fetch_github_text(f'{GITHUB_RAW_BASE}/VERSION_HISTORY.md')
+            new_sections = _parse_new_changelog(changelog_raw, __version__)
+        except Exception:
+            new_sections = []
+
+    has_backup = os.path.exists(_get_update_backup_dir())
+
+    return render_template('update.html',
+                           current_version=__version__,
+                           github_version=github_version,
+                           update_available=update_available,
+                           new_sections=new_sections,
+                           error=error,
+                           has_backup=has_backup)
+
+
+@app.route('/admin/update/apply', methods=['POST'])
+@admin_required
+def apply_update():
+    """Lädt die neueste Version von GitHub herunter und installiert sie."""
+    import urllib.request, zipfile, shutil
+
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    backup_dir = _get_update_backup_dir()
+
+    # Schutzliste: diese Einträge werden beim Update nie überschrieben
+    PRESERVE_FILES = {'.env', '.initial_password', 'klasseneinteilung.db'}
+    PRESERVE_DIRS  = {'flask_session', 'python-portable', 'update_backup', '__pycache__'}
+
+    # 1. Backup anlegen
+    try:
+        if os.path.exists(backup_dir):
+            shutil.rmtree(backup_dir)
+        os.makedirs(backup_dir, exist_ok=True)
+        for item in ['app.py', 'requirements.txt', 'VERSION_HISTORY.md']:
+            src = os.path.join(app_dir, item)
+            if os.path.exists(src):
+                shutil.copy2(src, os.path.join(backup_dir, item))
+        for folder in ['templates', 'static']:
+            src = os.path.join(app_dir, folder)
+            if os.path.exists(src):
+                shutil.copytree(src, os.path.join(backup_dir, folder))
+    except Exception as e:
+        flash(f'Backup fehlgeschlagen — Update abgebrochen: {e}', 'danger')
+        return redirect(url_for('check_update'))
+
+    # 2. ZIP von GitHub laden
+    try:
+        req = urllib.request.Request(
+            GITHUB_ZIP_URL,
+            headers={'User-Agent': 'KlasseneinteilungApp-Updater/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            zip_data = resp.read()
+    except Exception as e:
+        flash(f'Download fehlgeschlagen: {e}', 'danger')
+        return redirect(url_for('check_update'))
+
+    # 3. ZIP extrahieren und Dateien ersetzen
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+            names = zf.namelist()
+            if not names:
+                raise ValueError('ZIP ist leer.')
+            # GitHub ZIPs haben ein Top-Level-Verzeichnis: "repo-main/"
+            prefix = names[0].split('/')[0] + '/'
+
+            for member in names:
+                if not member.startswith(prefix):
+                    continue
+                rel = member[len(prefix):]  # Relativer Pfad im Zielverzeichnis
+                if not rel:
+                    continue
+                top = rel.split('/')[0]
+                if top in PRESERVE_FILES or top in PRESERVE_DIRS:
+                    continue
+                dest = os.path.join(app_dir, rel)
+                if member.endswith('/'):
+                    os.makedirs(dest, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with zf.open(member) as src_f, open(dest, 'wb') as dst_f:
+                        dst_f.write(src_f.read())
+
+        flash('✅ Update erfolgreich installiert! Bitte starte die App neu (Fenster schließen → PORTABLE-START.bat).', 'success')
+    except Exception as e:
+        # Automatischer Rollback
+        try:
+            _do_rollback()
+            flash(f'❌ Update fehlgeschlagen ({e}). Rollback erfolgreich — vorherige Version wiederhergestellt. Bitte App neu starten.', 'warning')
+        except Exception as rb_err:
+            flash(f'❌ Update UND Rollback fehlgeschlagen: {e} / {rb_err}. Manuelle Wiederherstellung erforderlich.', 'danger')
+
+    return redirect(url_for('check_update'))
+
+
+@app.route('/admin/update/rollback', methods=['POST'])
+@admin_required
+def rollback_update():
+    """Stellt die gesicherte Version manuell wieder her."""
+    try:
+        _do_rollback()
+        flash('↩️ Rollback erfolgreich. Bitte starte die App neu (Fenster schließen → PORTABLE-START.bat).', 'success')
+    except Exception as e:
+        flash(f'Rollback fehlgeschlagen: {e}', 'danger')
+    return redirect(url_for('check_update'))
+
 
 @app.route('/wizard')
 @login_required
@@ -2408,6 +2713,65 @@ def view_assignment(assignment_id):
                          assignment=assignment,
                          proposal=proposal,
                          num_classes=len(proposal['classes']))
+
+@app.route('/assignments/<int:assignment_id>/update', methods=['POST'])
+@login_required
+def update_assignment(assignment_id):
+    """Gespeicherte Einteilung nach Drag-&-Drop-Änderungen aktualisieren"""
+    arrangement_json = request.form.get('arrangement', '')
+    if not arrangement_json:
+        flash('Keine Änderungen übermittelt.', 'warning')
+        return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
+    try:
+        arrangement = json.loads(arrangement_json)  # {student_id: class_number_str}
+    except (ValueError, TypeError):
+        flash('Ungültige Daten.', 'danger')
+        return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
+    db = get_db()
+    row = db.execute('SELECT data FROM class_assignments WHERE id = ?', (assignment_id,)).fetchone()
+    if not row:
+        db.close()
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+
+    proposal = json.loads(row['data'])
+
+    # Alle Schüler aus der Einteilung als Lookup aufbauen
+    all_students = {}
+    for cls in proposal['classes']:
+        for s in cls['students']:
+            all_students[str(s['id'])] = s
+
+    # Klassen neu befüllen basierend auf der übermittelten Zuordnung
+    for cls in proposal['classes']:
+        cls_num = str(cls['number'])
+        new_students = [all_students[sid] for sid, cnum in arrangement.items()
+                        if cnum == cls_num and sid in all_students]
+        cls['students'] = new_students
+        cls['count'] = len(new_students)
+        cls['gender_count'] = {
+            'm': sum(1 for s in new_students if s.get('gender') == 'm'),
+            'w': sum(1 for s in new_students if s.get('gender') == 'w')
+        }
+        cls['schulform_count'] = {'H': 0, 'R': 0, 'G': 0, 'IB': 0, '': 0}
+        for s in new_students:
+            sf = s.get('schulform', '') or ''
+            if sf in cls['schulform_count']:
+                cls['schulform_count'][sf] += 1
+        cls['ib_count'] = sum(1 for s in new_students if s.get('schulform') == 'IB')
+        cls['sport_count'] = sum(1 for s in new_students if s.get('sportlich'))
+        cls['inklusion_count'] = sum(1 for s in new_students if s.get('special_needs'))
+
+    db.execute('UPDATE class_assignments SET data = ? WHERE id = ?',
+               (json.dumps(proposal), assignment_id))
+    db.commit()
+    db.close()
+
+    flash('Einteilung erfolgreich gespeichert.', 'success')
+    return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
 
 @app.route('/save_assignment', methods=['POST'])
 @login_required

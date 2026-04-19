@@ -10,10 +10,40 @@
     </div>
 </div>
 
+{% if wish_count == 0 %}
+<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+    <span style="font-size: 1.3rem;">⚠️</span>
+    <div>
+        <strong>Keine Elternw&uuml;nsche erfasst</strong> &mdash;
+        Die Einteilung erfolgt ohne Ber&uuml;cksichtigung von Zusammen- oder Trennungsw&uuml;nschen.
+        <a href="{{ url_for('wishes') }}" style="margin-left: 0.5rem;">Jetzt W&uuml;nsche erfassen →</a>
+    </div>
+</div>
+{% endif %}
+
 <div class="options-panel" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
     <h4 style="margin-top: 0;">Einteilungsoptionen</h4>
     <form method="POST" action="{{ url_for('generate') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% if existing_assignments %}
+        <div style="margin-bottom: 1.25rem; padding: 1rem; background: #e8f4fd; border: 1px solid #b8d9f0; border-radius: 6px;">
+            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">
+                Neue Sch&uuml;ler zu bestehender Einteilung hinzuf&uuml;gen
+            </label>
+            <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #555;">
+                Bestehende Sch&uuml;ler bleiben in ihrer Klasse &mdash; nur neue Sch&uuml;ler werden verteilt.
+            </p>
+            <select name="base_assignment_id" style="padding: 0.4rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95rem; max-width: 100%;">
+                <option value="">Keine Basis &mdash; komplett neu generieren</option>
+                {% for a in existing_assignments %}
+                <option value="{{ a.id }}" {% if selected_base_id == a.id|string %}selected{% endif %}>
+                    {{ a.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
         <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                 <input type="checkbox" name="gender_balance" value="1" {% if options.gender_balance %}checked{% endif %}>

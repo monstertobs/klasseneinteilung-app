@@ -3,15 +3,31 @@
 {% block title %}{{ assignment.name }} — Klasseneinteilung{% endblock %}
 
 {% block content %}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
 <div class="page-header">
     <div>
         <h2>{{ assignment.name }}</h2>
         <p>Erstellt von {{ assignment.username }} am {{ assignment.created_at }}</p>
     </div>
-    <div>
-        <a href="{{ url_for('assignments') }}" class="btn btn-secondary">Zurück zur Übersicht</a>
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <button type="button" id="edit-toggle-btn" class="btn btn-secondary" onclick="toggleEditMode()">Bearbeiten</button>
+        <a href="{{ url_for('assignments') }}" class="btn btn-secondary">Zur&uuml;ck zur &Uuml;bersicht</a>
     </div>
 </div>
+
+<div id="edit-mode-banner" style="display: none; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: none; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+    <span>✏️ <strong>Bearbeitungsmodus</strong> &mdash; Sch&uuml;ler per Drag &amp; Drop zwischen Klassen verschieben.</span>
+    <div style="display: flex; gap: 0.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="cancelEditMode()">Abbrechen</button>
+        <button type="button" class="btn btn-primary" onclick="saveChanges()">Änderungen speichern</button>
+    </div>
+</div>
+
+<form id="save-form" method="POST" action="{{ url_for('update_assignment', assignment_id=assignment.id) }}" style="display: none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="arrangement" id="arrangement-input">
+</form>
 
 <div class="proposals-container">
     <div class="proposal-card">
@@ -21,7 +37,10 @@
 
         <div class="classes-grid">
             {% for class in proposal.classes %}
-            <div class="class-card">
+            <div class="class-card"
+                 data-class-id="{{ class.number }}"
+                 data-class-name="5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}"
+                 data-class-size="{{ class.count }}">
                 <div class="class-header">
                     <h4>
                         Klasse 5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}
@@ -29,13 +48,13 @@
                         {% if class.special_type == 'sport' %} <span style="font-size: 0.8em;">&#9917;</span>{% endif %}
                         {% if class.special_type == 'custom' %} <span style="font-size: 0.8em; color: #6c757d;">({{ class.custom_name }})</span>{% endif %}
                     </h4>
-                    <span class="class-count">{{ class.count }} Schüler</span>
+                    <span class="class-count" id="count-{{ class.number }}">{{ class.count }} Sch&uuml;ler</span>
                 </div>
 
                 <div class="class-stats">
                     <div class="gender-distribution">
-                        <span class="gender-stat" title="Männlich">♂ {{ class.gender_count.m }}</span>
-                        <span class="gender-stat" title="Weiblich">♀ {{ class.gender_count.w }}</span>
+                        <span class="gender-stat" title="M&auml;nnlich">♂ <span id="m-{{ class.number }}">{{ class.gender_count.m }}</span></span>
+                        <span class="gender-stat" title="Weiblich">♀ <span id="w-{{ class.number }}">{{ class.gender_count.w }}</span></span>
                     </div>
                 </div>
 
@@ -66,7 +85,7 @@
                 {% if class.city_count and class.city_count|length > 0 %}
                 <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #e9ecef;">
                     <div style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                        📍 Wohnorte ({{ class.city_count|length }} Städte)
+                        📍 Wohnorte ({{ class.city_count|length }} St&auml;dte)
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
                         {% for city, count in class.city_count.items()|sort(attribute='1', reverse=True) %}
@@ -80,7 +99,11 @@
 
                 <div class="student-list">
                     {% for student in class.students %}
-                    <div class="student-item">
+                    <div class="student-item"
+                         data-student-id="{{ student.id }}"
+                         data-student-name="{{ student.lastname }}, {{ student.firstname }}"
+                         data-gender="{{ student.gender }}"
+                         data-schulform="{{ student.schulform }}">
                         {{ student.lastname }}, {{ student.firstname }}
 
                         {% if student.ikl %}
@@ -160,26 +183,68 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
 <script>
+let editModeActive = false;
+
+function toggleEditMode() {
+    editModeActive = !editModeActive;
+    const banner = document.getElementById('edit-mode-banner');
+    const btn = document.getElementById('edit-toggle-btn');
+    const items = document.querySelectorAll('.student-item');
+
+    if (editModeActive) {
+        banner.style.display = 'flex';
+        btn.textContent = 'Bearbeiten aktiv';
+        btn.style.background = '#ffc107';
+        btn.style.borderColor = '#ffc107';
+        btn.style.color = '#000';
+        items.forEach(item => {
+            item.setAttribute('draggable', 'true');
+            item.style.cursor = 'grab';
+        });
+        initializeDragDrop();
+    } else {
+        cancelEditMode();
+    }
+}
+
+function cancelEditMode() {
+    editModeActive = false;
+    document.getElementById('edit-mode-banner').style.display = 'none';
+    const btn = document.getElementById('edit-toggle-btn');
+    btn.textContent = 'Bearbeiten';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    document.querySelectorAll('.student-item').forEach(item => {
+        item.removeAttribute('draggable');
+        item.style.cursor = '';
+    });
+}
+
+function saveChanges() {
+    // Aktuelle Zuordnung aus dem DOM lesen: student_id -> class_number
+    const arrangement = {};
+    document.querySelectorAll('.student-item[data-student-id]').forEach(item => {
+        const card = item.closest('.class-card');
+        if (card) arrangement[item.dataset.studentId] = card.dataset.classId;
+    });
+    document.getElementById('arrangement-input').value = JSON.stringify(arrangement);
+    document.getElementById('save-form').submit();
+}
+
 // Export dropdown toggle
 function toggleExportMenu(index) {
     const menu = document.getElementById('export-menu-' + index);
     const isVisible = menu.style.display === 'block';
-
-    // Schließe alle anderen Dropdowns
-    document.querySelectorAll('.export-dropdown').forEach(function(dropdown) {
-        dropdown.style.display = 'none';
-    });
-
+    document.querySelectorAll('.export-dropdown').forEach(d => d.style.display = 'none');
     menu.style.display = isVisible ? 'none' : 'block';
 }
 
-// Schließe Dropdown bei Klick außerhalb
 document.addEventListener('click', function(event) {
     if (!event.target.closest('.export-container')) {
-        document.querySelectorAll('.export-dropdown').forEach(function(dropdown) {
-            dropdown.style.display = 'none';
-        });
+        document.querySelectorAll('.export-dropdown').forEach(d => d.style.display = 'none');
     }
 });
 </script>

@@ -6,6 +6,101 @@
 
 ---
 
+## Version 0.1.25 - Breitere Darstellung (max-width 1600px)
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserungen
+- **Layout:** `max-width` des Haupt-Containers von 1120px auf 1600px erhöht — die App nutzt jetzt die volle Breite auf großen Monitoren.
+
+---
+
+## Version 0.1.24 - In-App Update-System
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature
+- **In-App Update-System (Admin):** Unter "Update" in der Navbar kann der Admin prüfen ob eine neuere Version auf GitHub (monstertobs/klasseneinteilung-app) verfügbar ist.
+  - Zeigt Versionsvergleich und Änderungsnotizen der neuen Version
+  - "Update installieren" lädt die neue Version von GitHub und überschreibt App-Dateien (DB und .env bleiben erhalten)
+  - Automatischer Rollback bei Fehler im Update-Prozess
+  - Manueller Rollback-Button wenn Backup vorhanden
+  - Neustart-Hinweis nach Update/Rollback
+
+---
+
+## Version 0.1.23 - Einteilungen editierbar, Wünsche-Hinweis, harte Trennsperre
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neue Features
+- **Einteilungen bearbeiten:** Gespeicherte Einteilungen können per Drag & Drop geändert werden ("Bearbeiten"-Button). Änderungen werden mit "Änderungen speichern" in die DB zurückgeschrieben.
+- **Kein-Wünsche-Hinweis:** Wenn keine Elternwünsche erfasst sind, erscheint auf der Generieren-Seite ein gelber Warnhinweis mit Link zu Wünsche-Erfassung.
+
+### Bugfixes / Verbesserungen
+- **Trennungswünsche ("Auf keinen Fall mit"):** Strafe von −500 auf −5000 erhöht → quasi harte Sperre. Schüler werden praktisch nie mehr zusammen eingeteilt wenn ein Trennungswunsch besteht.
+
+---
+
+## Version 0.1.22 - Neue Schüler zu bestehender Einteilung hinzufügen
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature
+- **Basis-Einteilung:** Beim Generieren kann eine gespeicherte Einteilung als Basis gewählt werden. Bestehende Schüler bleiben in ihrer Klasse — nur neue Schüler (nicht in der Basis) werden durch den Algorithmus verteilt.
+- Gepinnte Schüler werden durch die Wunsch-Optimierung nicht bewegt.
+- UI: Dropdown auf der Generieren-Seite erscheint wenn gespeicherte Einteilungen vorhanden sind.
+
+---
+
+## Version 0.1.21 - Sportklasse: nur mit Hacken, IB ausgeschlossen
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserungen
+- **Import:** "Sportklasse"-Spalte setzt jetzt auch `sport_interesse=1` (bisher nur `sportlich`), damit der Algorithmus Schüler korrekt der Sportklasse zuordnet
+- **Algorithmus:** IB-Schüler ohne Sportklassen-Hacken können nicht mehr in die Sportklasse kommen (harte Sperre −5000)
+- **Algorithmus:** IB-Vorverteilung überspringt jetzt Sportklassen-Indizes für IB-Schüler ohne Hacken
+- **Algorithmus:** Nicht-IB-Schüler ohne Hacken werden stark von der Sportklasse ferngehalten (−200 statt −20)
+- **Ausnahme:** IB-Schüler MIT Sportklassen-Hacken können weiterhin in die Sportklasse
+
+---
+
+## Version 0.1.20 - Eignung hat Vorrang vor Elternwunsch
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserungen
+- **Import:** Wenn "Eignung"=R oder H, bleibt die Schulform dabei — auch wenn Elternwunsch (z.B. in "Infos Übergabe" oder einer anderen Schulform-Spalte) Gymnasium angibt. Warnung wird im Import-Log angezeigt.
+
+---
+
+## Version 0.1.19 - Religion Fallback auf Ethik
+**Release Date:** 19. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### 🐛 Bugfixes / Verbesserungen
+- **Import:** Nicht erkannte Religionswerte werden jetzt automatisch auf "Ethik" gesetzt (statt Warnung + falscher Wert). Nur "katholisch" und "evangelisch" (inkl. Varianten) bleiben erhalten.
+
+---
+
+## Version 0.1.18 - Bugfix: Flask-Login in Portable Setup
+**Release Date:** 12. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### 🐛 Bugfixes
+- **CRITICAL:** `Flask-Login==0.6.3` fehlte im `pip install`-Befehl in `PORTABLE-SETUP-WIN11.bat` → App startete auf Windows nicht (ModuleNotFoundError)
+
+---
+
 ## Version 2.1.0 - Algorithm & Transparency Release
 **Release Date:** February 21, 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -320,6 +415,6 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Last Updated:** February 21, 2026
-**Current Version:** 2.1.0
+**Last Updated:** 19. April 2026
+**Current Version:** 0.1.25
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>
