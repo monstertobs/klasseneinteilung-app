@@ -6,6 +6,22 @@
 
 ---
 
+## Version 0.1.30 - Bugfix Einteilung-Bearbeiten + Sportklasse-Logik
+**Release Date:** 20. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Bugfixes
+- **KRITISCH: Einteilung bearbeiten → Änderungen speichern** gab "Interner Server Error" — `import json` fehlte in `update_assignment`-Route
+
+### Sportklasse-Logik
+- **Import:** Spalte "Sportklasse" setzt nur noch `sport_interesse` (nicht mehr `sportlich`) — einziges Kriterium für Sportklassen-Zuteilung
+- **Import:** Spalte "Sportattest" wird explizit ignoriert — hat keinen Einfluss auf Sportklasse
+- **Formular:** Checkboxen "Besonders sportlich" und "Interesse an Sportklasse" aus Schüler-Formularen entfernt — Sportklasse-Zuordnung nur noch über Excel-Import möglich
+- **IB-Sperre:** IB-Schüler ohne Sportklasse-Hacken bleiben hart gesperrt (−5000)
+
+---
+
 ## Version 0.1.29 - Auto-Restart Fix (Delay vor SIGHUP)
 **Release Date:** 19. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -463,5 +479,5 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Last Updated:** 19. April 2026
-**Current Version:** 0.1.29
+**Current Version:** 0.1.30
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>

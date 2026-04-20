@@ -59,22 +59,12 @@
             </select>
         </div>
 
-        <div class="form-group">
-            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="checkbox" name="sportlich" value="1" {% if student.sportlich %}checked{% endif %}>
-                Besonders sportlich (Sportklasse)
-            </label>
-        </div>
-
-        <div class="form-group">
-            <label>Interesse an Sportklasse</label>
-            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="sport_interesse" value="1" {% if student.sport_interesse %}checked{% endif %}>
-                    Sport
-                </label>
-            </div>
-            <small class="form-text">W&auml;hlen Sie bei Interesse an Sportklasse</small>
+        <div class="form-group" style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:0.75rem 1rem;">
+            {% if student.sport_interesse %}
+            <small style="color:#856404;">&#9432; Dieser Sch&uuml;ler hat einen Sportklasse-Hacken (aus Import). &Auml;nderungen nur &uuml;ber erneuten Import m&ouml;glich.</small>
+            {% else %}
+            <small style="color:#856404;">&#9432; Sportklasse-Zuordnung erfolgt ausschlie&szlig;lich &uuml;ber den Import (Spalte &bdquo;Sportklasse&ldquo; in der Excel-Liste).</small>
+            {% endif %}
         </div>
 
         <div class="form-group">

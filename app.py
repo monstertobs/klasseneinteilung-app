@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.29
+Version: 0.1.30
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.29'
+__version__ = '0.1.30'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -701,8 +701,9 @@ def process_import_data(data, batch_id):
         'wohnort': ['wohnort', 'ort', 'adresse', 'address', 'schulweg', 'location', 'slr_wonadresse', 'slr_wohnadresse'],
         'schulform': ['schulform', 'schule', 'school_type', 'bildungsgang', 'eignung'],
         'religion': ['religion', 'konfession', 'wahlfach religion'],
-        'sportlich': ['sportlich', 'sport', 'athletic', 'sporty', 'sportklasse'],
+        'sportlich': ['sportlich', 'athletic', 'sporty'],
         'sport_interesse': ['sportklasse'],  # Sportklassen-Hacken = Schüler soll in Sportklasse
+        # Hinweis: 'Sportattest' wird absichtlich ignoriert (nur Attests-Status, kein Einfluss auf Sportklasse)
         'special_needs': ['förderbedarf', 'foerderbedarf', 'special_needs', 'special needs', 'sonderpädagogik'],
         'notes': ['notizen', 'notes', 'bemerkungen', 'anmerkungen', 'infos übergabe', 'infos uebergabe', 'sonstige / einwände', 'sonstige / einwaende', 'sonstige']
     }
@@ -2736,6 +2737,7 @@ def view_assignment(assignment_id):
 @login_required
 def update_assignment(assignment_id):
     """Gespeicherte Einteilung nach Drag-&-Drop-Änderungen aktualisieren"""
+    import json
     arrangement_json = request.form.get('arrangement', '')
     if not arrangement_json:
         flash('Keine Änderungen übermittelt.', 'warning')
