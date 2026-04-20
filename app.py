@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.33
+Version: 0.1.34
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 20. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.33'
+__version__ = '0.1.34'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -132,23 +132,24 @@ def check_idle_timeout():
     # Online-Status aktualisieren
     _online_users[session['user_id']] = now
 
-    # Freischaltungs-Check (einmal pro Request, leichtgewichtig)
-    db = get_main_db()
-    if not session.get('is_admin'):
-        row = db.execute('SELECT is_approved FROM users WHERE id = ?',
-                         (session['user_id'],)).fetchone()
-        if row and not row['is_approved']:
-            db.close()
-            session.clear()
-            flash('Ihr Konto wurde noch nicht freigeschaltet oder wurde gesperrt.', 'warning')
-            return redirect(url_for('login'))
-        # Pending-Count nicht nötig für normale User
-        g.pending_users_count = 0
-    else:
-        # Admin: Anzahl ausstehender Freischaltungen für Navbar-Badge
-        row = db.execute('SELECT COUNT(*) FROM users WHERE is_approved = 0').fetchone()
-        g.pending_users_count = row[0] if row else 0
-    db.close()
+    # Freischaltungs-Check + Pending-Badge (immer setzen, auch bei Fehler)
+    g.pending_users_count = 0
+    try:
+        db = get_main_db()
+        if not session.get('is_admin'):
+            row = db.execute('SELECT is_approved FROM users WHERE id = ?',
+                             (session['user_id'],)).fetchone()
+            if row and not dict(row).get('is_approved', 1):
+                db.close()
+                session.clear()
+                flash('Ihr Konto wurde noch nicht freigeschaltet oder wurde gesperrt.', 'warning')
+                return redirect(url_for('login'))
+        else:
+            row = db.execute('SELECT COUNT(*) FROM users WHERE is_approved = 0').fetchone()
+            g.pending_users_count = row[0] if row else 0
+        db.close()
+    except Exception:
+        pass  # Spalte existiert noch nicht (Migration läuft beim nächsten Start)
 
     last_activity = session.get('last_activity')
     if last_activity:
@@ -503,7 +504,7 @@ def login():
         db.close()
 
         if user and check_password_hash(user['password_hash'], password):
-            if not user['is_approved']:
+            if not dict(user).get('is_approved', 1):
                 flash('Ihr Konto wartet noch auf die Freischaltung durch den Administrator.', 'warning')
                 return render_template('login.html', initial_password=None)
             init_user_db(user['id'])  # DB anlegen falls noch nicht vorhanden
@@ -3855,9 +3856,12 @@ def ratelimit_handler(error):
     flash('Zu viele Anfragen. Bitte versuchen Sie es später erneut.', 'warning')
     return redirect(url_for('login')), 429
 
-if __name__ == '__main__':
-    # Datenbank initialisieren (immer ausführen für Migrationen)
+# Datenbank beim Laden des Moduls initialisieren – funktioniert mit gunicorn,
+# passenger und direktem Start (python3 app.py).
+try:
     init_db()
+except Exception as _init_err:
+    print(f"Warning: init_db() failed on module load: {_init_err}")
 
-    # App starten
+if __name__ == '__main__':
     app.run(debug=(os.environ.get('FLASK_ENV') == 'development'), host='0.0.0.0', port=5050)
