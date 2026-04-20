@@ -6,11 +6,9 @@
 <div class="page-header">
     <div>
         <h2>Benutzerverwaltung</h2>
-        <p>{{ users|length }} von 10 Benutzern</p>
+        <p>{{ users|length }} Benutzer &mdash; jeder mit eigener Datenbank</p>
     </div>
-    {% if users|length < 10 %}
     <a href="{{ url_for('add_user') }}" class="btn btn-primary">Benutzer hinzuf&uuml;gen</a>
-    {% endif %}
 </div>
 
 <div class="table-container">
@@ -20,6 +18,8 @@
                 <th>Nr.</th>
                 <th>Benutzername</th>
                 <th>Erstellt am</th>
+                <th style="text-align:center;">Sch&uuml;ler</th>
+                <th style="text-align:center;">Einteilungen</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
@@ -29,11 +29,16 @@
                 <td>{{ loop.index }}</td>
                 <td>
                     <strong>{{ user.username }}</strong>
+                    {% if user.username == 'admin' %}
+                    <span class="badge badge-dark">Admin</span>
+                    {% endif %}
                     {% if user.id == session.user_id %}
                     <span class="badge badge-info">Sie</span>
                     {% endif %}
                 </td>
                 <td>{{ user.created_at }}</td>
+                <td style="text-align:center;">{{ user.stats.students }}</td>
+                <td style="text-align:center;">{{ user.stats.assignments }}</td>
                 <td>
                     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                         <button class="btn btn-secondary btn-sm"
@@ -41,7 +46,8 @@
                             Passwort&nbsp;setzen
                         </button>
                         {% if user.id != session.user_id %}
-                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Benutzer wirklich l\u00f6schen?');">
+                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form"
+                              onsubmit="return confirm('Benutzer \u00bb{{ user.username }}\u00ab und ALLE zugehörigen Daten wirklich l\u00f6schen?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
                         </form>
@@ -57,9 +63,10 @@
 <div class="info-box" style="margin-top: 1.5rem;">
     <h4>Hinweise zur Benutzerverwaltung</h4>
     <ul>
-        <li>Es k&ouml;nnen maximal 10 Benutzer angelegt werden</li>
-        <li>Jeder Benutzer ben&ouml;tigt einen eindeutigen Benutzernamen</li>
+        <li>Jeder Benutzer hat eine <strong>eigene, isolierte Datenbank</strong> &mdash; Daten sind vollst&auml;ndig getrennt</li>
+        <li>Neue Benutzer k&ouml;nnen sich selbst &uuml;ber die <a href="{{ url_for('register') }}">Registrierungsseite</a> anmelden</li>
         <li><strong>Passwort setzen</strong> setzt das Passwort direkt &mdash; das alte Passwort wird nicht ben&ouml;tigt</li>
+        <li>Beim L&ouml;schen eines Benutzers werden <strong>alle seine Daten unwiderruflich gel&ouml;scht</strong></li>
         <li>Sie k&ouml;nnen sich nicht selbst l&ouml;schen</li>
         <li>Eigenes Passwort &auml;ndern (mit aktuellem Passwort): <a href="{{ url_for('change_password') }}">Passwort&auml;ndern-Seite</a></li>
     </ul>

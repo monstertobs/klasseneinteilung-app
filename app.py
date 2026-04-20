@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.31
+Version: 0.1.32
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 19. April 2026
+Date: 20. April 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.31'
+__version__ = '0.1.32'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -144,31 +144,42 @@ def after_request(response):
     return response
 
 DATABASE = 'klasseneinteilung.db'
+USER_DATA_DIR = 'user_data'
 
-def get_db():
-    """Datenbankverbindung herstellen"""
+
+def get_user_db_path(user_id):
+    """Pfad zur benutzerspezifischen Datenbank"""
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
+    return os.path.join(USER_DATA_DIR, f'user_{user_id}.db')
+
+
+def get_main_db():
+    """Verbindung zur Haupt-Datenbank (nur users-Tabelle)"""
     db = sqlite3.connect(DATABASE)
     db.row_factory = sqlite3.Row
-    # UTF-8 Encoding für Text-Daten erzwingen
     db.text_factory = str
     return db
 
-def init_db():
-    """Datenbank initialisieren"""
-    db = get_db()
+
+def get_db():
+    """Verbindung zur benutzerspezifischen Datenbank des eingeloggten Nutzers"""
+    from flask import session
+    user_id = session.get('user_id')
+    if not user_id:
+        raise RuntimeError('Kein Benutzer angemeldet')
+    db_path = get_user_db_path(user_id)
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    db.text_factory = str
+    return db
+
+def init_user_db(user_id):
+    """Schema für die benutzerspezifische Datenbank anlegen / migrieren"""
+    db_path = get_user_db_path(user_id)
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
     cursor = db.cursor()
-    
-    # Benutzer-Tabelle
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Schüler-Tabelle
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,14 +192,11 @@ def init_db():
             sportlich INTEGER DEFAULT 0,
             special_needs TEXT,
             notes TEXT,
-            created_by INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            import_batch_id TEXT,
-            FOREIGN KEY (created_by) REFERENCES users (id)
+            import_batch_id TEXT
         )
     ''')
 
-    # Spalten nachträglich hinzufügen (für bestehende Datenbanken)
     for col, coldef in [
         ('religion', 'TEXT DEFAULT ""'),
         ('sportlich', 'INTEGER DEFAULT 0'),
@@ -203,9 +211,8 @@ def init_db():
         try:
             cursor.execute(f'ALTER TABLE students ADD COLUMN {col} {coldef}')
         except sqlite3.OperationalError:
-            pass  # Spalte existiert bereits
-    
-    # Elternwünsche-Tabelle
+            pass
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS parent_wishes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -218,33 +225,118 @@ def init_db():
             FOREIGN KEY (related_student_id) REFERENCES students (id)
         )
     ''')
-    
-    # Klasseneinteilungen-Tabelle
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS class_assignments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             data TEXT NOT NULL,
-            created_by INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (created_by) REFERENCES users (id)
+            username TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
+    db.commit()
+    db.close()
+
+
+def _migrate_legacy_data():
+    """Vorhandene Daten aus der monolithischen DB in Admin-User-DB übertragen (einmalig)"""
+    marker = os.path.join(USER_DATA_DIR, '.migrated')
+    if os.path.exists(marker):
+        return
+
+    main_db = get_main_db()
+    cursor = main_db.cursor()
+
+    # Prüfen ob alte Tabellen existieren
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='students'")
+    if not cursor.fetchone():
+        main_db.close()
+        # Kein alter Datenbestand – trotzdem Marker setzen
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+        open(marker, 'w').close()
+        return
+
+    cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+    admin = cursor.fetchone()
+    if not admin:
+        main_db.close()
+        return
+
+    admin_id = admin['id']
+    init_user_db(admin_id)
+    user_db = sqlite3.connect(get_user_db_path(admin_id))
+    user_db.row_factory = sqlite3.Row
+    uc = user_db.cursor()
+
+    # Schüler migrieren (IDs beibehalten wegen Elternwunsch-Referenzen)
+    cursor.execute('SELECT * FROM students')
+    for s in cursor.fetchall():
+        sd = dict(s)
+        cols = [c for c in sd.keys() if c != 'created_by']
+        placeholders = ','.join('?' * len(cols))
+        col_names = ','.join(cols)
+        uc.execute(
+            f'INSERT OR IGNORE INTO students ({col_names}) VALUES ({placeholders})',
+            [sd[c] for c in cols]
+        )
+
+    # Elternwünsche migrieren
+    cursor.execute('SELECT * FROM parent_wishes')
+    for w in cursor.fetchall():
+        wd = dict(w)
+        cols = list(wd.keys())
+        placeholders = ','.join('?' * len(cols))
+        col_names = ','.join(cols)
+        uc.execute(
+            f'INSERT OR IGNORE INTO parent_wishes ({col_names}) VALUES ({placeholders})',
+            [wd[c] for c in cols]
+        )
+
+    # Klasseneinteilungen migrieren
+    cursor.execute('SELECT * FROM class_assignments')
+    for a in cursor.fetchall():
+        ad = dict(a)
+        uc.execute(
+            'INSERT OR IGNORE INTO class_assignments (id, name, data, username, created_at) VALUES (?,?,?,?,?)',
+            (ad['id'], ad['name'], ad['data'], 'admin', ad.get('created_at', ''))
+        )
+
+    user_db.commit()
+    user_db.close()
+    main_db.close()
+
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
+    open(marker, 'w').close()
+    print("Migration: Bestehende Daten wurden in Admin-Datenbank übertragen.")
+
+
+def init_db():
+    """Haupt-Datenbank initialisieren (nur users-Tabelle) + User-DBs anlegen"""
+    db = get_main_db()
+    cursor = db.cursor()
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Standard-Admin-User erstellen (falls nicht vorhanden)
     cursor.execute('SELECT * FROM users WHERE username = ?', ('admin',))
     if not cursor.fetchone():
         try:
-            # Generiere ein sicheres zufälliges Passwort (16 Zeichen)
             alphabet = string.ascii_letters + string.digits + string.punctuation
             initial_password = ''.join(secrets.choice(alphabet) for _ in range(16))
-
-            # Hash das Passwort mit pbkdf2 für Kompatibilität
             password_hash = generate_password_hash(initial_password, method='pbkdf2:sha256')
             cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
                           ('admin', password_hash))
+            db.commit()
 
-            # WICHTIG: Passwort nur EINMAL anzeigen (wird nicht gespeichert!)
             print("\n" + "="*70)
             print("WICHTIG: Neuer Admin-Account erstellt!")
             print("="*70)
@@ -255,16 +347,22 @@ def init_db():
             print("Das Passwort wird nicht erneut angezeigt und ist nicht wiederherstellbar.")
             print("="*70 + "\n")
 
-            # Passwort in temporärer Datei speichern für Anzeige auf Login-Seite
             with open('.initial_password', 'w') as f:
                 f.write(initial_password)
         except Exception as e:
-            # Skip admin user creation if error (user should already exist in DB)
             print(f"Warning: Could not create admin user: {e}")
-            pass
-    
+
     db.commit()
+
+    # User-DBs für alle vorhandenen Nutzer anlegen / migrieren
+    cursor.execute('SELECT id FROM users')
+    for row in cursor.fetchall():
+        init_user_db(row['id'])
+
     db.close()
+
+    # Einmalige Migration aus altem monolithischem Schema
+    _migrate_legacy_data()
 
 def login_required(f):
     """Decorator für Login-Pflicht"""
@@ -358,13 +456,14 @@ def login():
             flash('Bitte füllen Sie alle Felder aus.', 'danger')
             return render_template('login.html')
 
-        db = get_db()
+        db = get_main_db()
         cursor = db.cursor()
         cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
         user = cursor.fetchone()
         db.close()
 
         if user and check_password_hash(user['password_hash'], password):
+            init_user_db(user['id'])  # DB anlegen falls noch nicht vorhanden
             session.clear()  # Alte Session-Daten löschen
             session['user_id'] = user['id']
             session['username'] = user['username']
@@ -392,6 +491,65 @@ def logout():
     session.clear()
     flash('Sie wurden abgemeldet.', 'info')
     return redirect(url_for('login'))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def register():
+    """Selbstregistrierung – neuer Benutzer mit eigener Datenbank"""
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        password_confirm = request.form.get('password_confirm', '')
+
+        if not username or not password:
+            flash('Benutzername und Passwort sind erforderlich.', 'danger')
+        elif len(username) < 3 or len(username) > 30:
+            flash('Benutzername muss 3–30 Zeichen lang sein.', 'danger')
+        elif not re.match(r'^[a-zA-Z0-9_.-]+$', username):
+            flash('Benutzername darf nur Buchstaben, Ziffern, _, . und - enthalten.', 'danger')
+        elif username.lower() == 'admin':
+            flash('Dieser Benutzername ist reserviert.', 'danger')
+        elif password != password_confirm:
+            flash('Passwörter stimmen nicht überein.', 'danger')
+        else:
+            is_valid, error_msg = validate_password(password)
+            if not is_valid:
+                flash(error_msg, 'danger')
+            else:
+                db = get_main_db()
+                cursor = db.cursor()
+                cursor.execute('SELECT COUNT(*) as count FROM users')
+                if cursor.fetchone()['count'] >= 50:
+                    db.close()
+                    flash('Maximale Benutzeranzahl erreicht. Bitte wenden Sie sich an den Administrator.', 'danger')
+                else:
+                    cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+                    if cursor.fetchone():
+                        db.close()
+                        flash('Dieser Benutzername ist bereits vergeben.', 'danger')
+                    else:
+                        password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+                        cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
+                                       (username, password_hash))
+                        db.commit()
+                        new_id = cursor.lastrowid
+                        db.close()
+                        init_user_db(new_id)
+                        session.clear()
+                        session['user_id'] = new_id
+                        session['username'] = username
+                        session['is_admin'] = False
+                        session.permanent = True
+                        session['last_activity'] = datetime.now().isoformat()
+                        flash(f'Willkommen, {username}! Ihr Konto wurde erstellt.', 'success')
+                        return redirect(url_for('dashboard'))
+
+    return render_template('register.html')
+
 
 @app.route('/dashboard')
 @login_required
@@ -2616,12 +2774,7 @@ def assignments():
     """Gespeicherte Einteilungen anzeigen"""
     db = get_db()
     cursor = db.cursor()
-    cursor.execute('''
-        SELECT ca.*, u.username
-        FROM class_assignments ca
-        LEFT JOIN users u ON ca.created_by = u.id
-        ORDER BY ca.created_at DESC
-    ''')
+    cursor.execute('SELECT * FROM class_assignments ORDER BY created_at DESC')
     assignments = cursor.fetchall()
     db.close()
 
@@ -2642,9 +2795,9 @@ def compare_assignments():
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute('SELECT ca.*, u.username FROM class_assignments ca LEFT JOIN users u ON ca.created_by = u.id WHERE ca.id = ?', (a_id,))
+    cursor.execute('SELECT * FROM class_assignments WHERE id = ?', (a_id,))
     assignment_a = cursor.fetchone()
-    cursor.execute('SELECT ca.*, u.username FROM class_assignments ca LEFT JOIN users u ON ca.created_by = u.id WHERE ca.id = ?', (b_id,))
+    cursor.execute('SELECT * FROM class_assignments WHERE id = ?', (b_id,))
     assignment_b = cursor.fetchone()
     db.close()
 
@@ -2711,12 +2864,7 @@ def view_assignment(assignment_id):
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute('''
-        SELECT ca.*, u.username
-        FROM class_assignments ca
-        LEFT JOIN users u ON ca.created_by = u.id
-        WHERE ca.id = ?
-    ''', (assignment_id,))
+    cursor.execute('SELECT * FROM class_assignments WHERE id = ?', (assignment_id,))
     assignment = cursor.fetchone()
     db.close()
 
@@ -2816,9 +2964,9 @@ def save_assignment():
     db = get_db()
     cursor = db.cursor()
     cursor.execute('''
-        INSERT INTO class_assignments (name, data, created_by, created_at)
+        INSERT INTO class_assignments (name, data, username, created_at)
         VALUES (?, ?, ?, ?)
-    ''', (assignment_name, json.dumps(proposal), session['user_id'], now.strftime('%Y-%m-%d %H:%M:%S')))
+    ''', (assignment_name, json.dumps(proposal), session.get('username', ''), now.strftime('%Y-%m-%d %H:%M:%S')))
     db.commit()
     db.close()
 
@@ -3399,12 +3547,7 @@ def assignment_transparency(assignment_id):
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute('''
-        SELECT ca.*, u.username
-        FROM class_assignments ca
-        LEFT JOIN users u ON ca.created_by = u.id
-        WHERE ca.id = ?
-    ''', (assignment_id,))
+    cursor.execute('SELECT * FROM class_assignments WHERE id = ?', (assignment_id,))
     assignment = cursor.fetchone()
 
     if not assignment:
@@ -3429,31 +3572,50 @@ def assignment_transparency(assignment_id):
 @app.route('/users')
 @admin_required
 def users():
-    """Benutzerverwaltung"""
-    db = get_db()
+    """Benutzerverwaltung mit DB-Statistiken"""
+    db = get_main_db()
     cursor = db.cursor()
     cursor.execute('SELECT id, username, created_at FROM users ORDER BY username')
-    users = cursor.fetchall()
+    users_raw = cursor.fetchall()
     db.close()
-    
-    return render_template('users.html', users=users)
+
+    # Statistiken pro Nutzer aus jeweiliger User-DB ermitteln
+    users_list = []
+    for u in users_raw:
+        stats = {'students': 0, 'assignments': 0}
+        db_path = get_user_db_path(u['id'])
+        if os.path.exists(db_path):
+            try:
+                udb = sqlite3.connect(db_path)
+                uc = udb.cursor()
+                uc.execute('SELECT COUNT(*) FROM students')
+                stats['students'] = uc.fetchone()[0]
+                uc.execute('SELECT COUNT(*) FROM class_assignments')
+                stats['assignments'] = uc.fetchone()[0]
+                udb.close()
+            except Exception:
+                pass
+        d = dict(u)
+        d['stats'] = stats
+        users_list.append(d)
+
+    return render_template('users.html', users=users_list)
 
 @app.route('/users/add', methods=['GET', 'POST'])
 @admin_required
 def add_user():
     """Benutzer hinzufügen"""
-    db = get_db()
+    db = get_main_db()
     cursor = db.cursor()
-    
-    # Anzahl der User prüfen
+
     cursor.execute('SELECT COUNT(*) as count FROM users')
     user_count = cursor.fetchone()['count']
-    
-    if user_count >= 10:
-        flash('Maximale Anzahl von 10 Benutzern erreicht.', 'warning')
+
+    if user_count >= 50:
+        flash('Maximale Anzahl von 50 Benutzern erreicht.', 'warning')
         db.close()
         return redirect(url_for('users'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -3464,25 +3626,24 @@ def add_user():
         elif password != password_confirm:
             flash('Passwörter stimmen nicht überein.', 'danger')
         else:
-            # Starke Passwort-Validierung
             is_valid, error_msg = validate_password(password)
             if not is_valid:
                 flash(error_msg, 'danger')
             else:
-                # Prüfen ob Benutzername bereits existiert
                 cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
                 if cursor.fetchone():
                     flash('Benutzername existiert bereits.', 'danger')
                 else:
-                    # Use pbkdf2 instead of scrypt for compatibility
                     password_hash = generate_password_hash(password, method='pbkdf2:sha256')
                     cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
-                                 (username, password_hash))
+                                   (username, password_hash))
                     db.commit()
-                    flash(f'Benutzer {username} wurde erstellt.', 'success')
+                    new_id = cursor.lastrowid
                     db.close()
+                    init_user_db(new_id)
+                    flash(f'Benutzer {username} wurde erstellt.', 'success')
                     return redirect(url_for('users'))
-    
+
     db.close()
     return render_template('add_user.html')
 
@@ -3490,18 +3651,25 @@ def add_user():
 @admin_required
 def delete_user(user_id):
     """Benutzer löschen"""
-    # Verhindere Selbstlöschung
     if user_id == session['user_id']:
         flash('Sie können sich nicht selbst löschen.', 'danger')
         return redirect(url_for('users'))
 
-    db = get_db()
+    db = get_main_db()
     cursor = db.cursor()
     cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
     db.commit()
     db.close()
 
-    flash('Benutzer wurde gelöscht.', 'success')
+    # Benutzerspezifische DB-Datei löschen
+    db_path = get_user_db_path(user_id)
+    if os.path.exists(db_path):
+        try:
+            os.remove(db_path)
+        except Exception:
+            pass
+
+    flash('Benutzer und zugehörige Daten wurden gelöscht.', 'success')
     return redirect(url_for('users'))
 
 @app.route('/users/reset-password/<int:user_id>', methods=['POST'])
@@ -3520,7 +3688,7 @@ def reset_user_password(user_id):
         flash(error_msg, 'danger')
         return redirect(url_for('users'))
 
-    db = get_db()
+    db = get_main_db()
     cursor = db.cursor()
     cursor.execute('SELECT id, username FROM users WHERE id = ?', (user_id,))
     user = cursor.fetchone()
@@ -3547,7 +3715,7 @@ def change_password():
         new_password = request.form.get('new_password', '')
         new_password_confirm = request.form.get('new_password_confirm', '')
 
-        db = get_db()
+        db = get_main_db()
         cursor = db.cursor()
         cursor.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],))
         user = cursor.fetchone()

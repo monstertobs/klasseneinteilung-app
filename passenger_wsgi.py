@@ -26,11 +26,9 @@ sys.path.insert(0, '/home/f018021b/klasseneinteilung-app')
 # Umgebungsvariablen setzen (optional)
 os.environ['FLASK_ENV'] = 'production'
 
-# Datenbank initialisieren, falls noch nicht vorhanden
+# Datenbank initialisieren (immer, für Migrationen und neue User-DBs)
 from app import init_db
-import os
-if not os.path.exists('klasseneinteilung.db'):
-    init_db()
+init_db()
 
 # Flask-App importieren
 from app import app as application

@@ -32,6 +32,10 @@
             <p class="text-small">Bitte &auml;ndern Sie das Passwort nach der ersten Anmeldung.</p>
         </div>
         {% endif %}
+
+        <div style="text-align:center; margin-top:1.25rem; color:#86868b; font-size:0.9rem;">
+            Noch kein Konto? <a href="{{ url_for('register') }}">Jetzt registrieren</a>
+        </div>
     </div>
 </div>
 {% endblock %}

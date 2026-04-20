@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Registrieren — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-box">
+        <div class="login-header">
+            <h2>Klasseneinteilung</h2>
+            <p>Neues Konto erstellen</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('register') }}" class="login-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="username">Benutzername</label>
+                <input type="text" id="username" name="username" class="form-control"
+                       required autofocus minlength="3" maxlength="30"
+                       pattern="[a-zA-Z0-9_.\-]+"
+                       title="Nur Buchstaben, Ziffern, _, . und -"
+                       value="{{ request.form.get('username', '') }}">
+                <small style="color:#86868b;">3–30 Zeichen, nur Buchstaben/Ziffern/_ . -</small>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+                <small style="color:#86868b;">Mind. 8 Zeichen, Groß-/Kleinbuchstaben und Zahl</small>
+            </div>
+
+            <div class="form-group">
+                <label for="password_confirm">Passwort bestätigen</label>
+                <input type="password" id="password_confirm" name="password_confirm" class="form-control" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Konto erstellen</button>
+        </form>
+
+        <div style="text-align:center; margin-top:1.25rem; color:#86868b; font-size:0.9rem;">
+            Bereits ein Konto? <a href="{{ url_for('login') }}">Anmelden</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
