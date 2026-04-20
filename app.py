@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.35
+Version: 0.1.36
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 20. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.35'
+__version__ = '0.1.36'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2656,7 +2656,7 @@ def apply_update():
 
     # Schutzliste: diese Einträge werden beim Update nie überschrieben
     PRESERVE_FILES = {'.env', '.initial_password', 'klasseneinteilung.db'}
-    PRESERVE_DIRS  = {'flask_session', 'python-portable', 'update_backup', '__pycache__'}
+    PRESERVE_DIRS  = {'flask_session', 'python-portable', 'update_backup', '__pycache__', 'user_data', 'venv'}
 
     # 1. Backup anlegen
     try:
