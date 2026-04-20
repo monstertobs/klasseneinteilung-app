@@ -102,8 +102,16 @@
                     <div class="student-item"
                          data-student-id="{{ student.id }}"
                          data-student-name="{{ student.lastname }}, {{ student.firstname }}"
-                         data-gender="{{ student.gender }}"
-                         data-schulform="{{ student.schulform }}">
+                         data-gender="{{ student.gender or '' }}"
+                         data-schulform="{{ student.schulform or '' }}"
+                         data-wohnort="{{ student.wohnort or '' }}"
+                         data-religion="{{ student.religion or '' }}"
+                         data-sport-interesse="{{ '1' if student.sport_interesse else '0' }}"
+                         data-ikl="{{ '1' if student.ikl else '0' }}"
+                         data-special-needs="{{ student.special_needs or '' }}"
+                         data-notes="{{ student.notes or '' }}"
+                         onclick="if(!editModeActive) openStudentModal(this)"
+                         style="cursor:pointer;">
                         {{ student.lastname }}, {{ student.firstname }}
 
                         {% if student.ikl %}
@@ -202,6 +210,7 @@ function toggleEditMode() {
         items.forEach(item => {
             item.setAttribute('draggable', 'true');
             item.style.cursor = 'grab';
+            item.style.pointerEvents = 'auto';
         });
         initializeDragDrop();
     } else {

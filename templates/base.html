@@ -155,7 +155,7 @@
             <p>
                 &copy; 2026 Tobias Meier &middot;
                 <a href="mailto:admin(at)secutobs.com" style="color: inherit; text-decoration: none;">admin(at)secutobs.com</a> &middot;
-                Klasseneinteilung v0.1.30 &middot;
+                Klasseneinteilung v0.1.31 &middot;
                 DSGVO-konform &middot;
                 Lokale Datenspeicherung
             </p>
@@ -163,5 +163,54 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+<!-- Schüler-Info Modal -->
+<div id="student-info-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:8000; align-items:center; justify-content:center;" onclick="if(event.target===this)closeStudentModal()">
+    <div style="background:#fff; border-radius:16px; padding:2rem; max-width:480px; width:92%; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.2); position:relative;">
+        <button onclick="closeStudentModal()" style="position:absolute; top:1rem; right:1rem; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666; line-height:1;">&times;</button>
+        <h3 id="sm-name" style="margin:0 2rem 1.5rem 0; color:#1d1d1f; font-size:1.2rem;"></h3>
+        <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            <tbody id="sm-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function openStudentModal(el) {
+    var labels = {
+        gender: {'m':'Männlich','w':'Weiblich','d':'Divers','':'—'},
+        schulform: {'H':'Hauptschule','R':'Realschule','G':'Gymnasium','IB':'Inklusion (IB)','':'—'},
+        religion: {'ethik':'Ethik','katholisch':'Katholisch','evangelisch':'Evangelisch','':'—'},
+        special_needs: {'lernen':'Lernen','sozial_emotional':'Sozial/Emotional (ESE)','sprache':'Sprache','kme':'KME (körperlich-motorisch)','sehen':'Sehen','hoerschaedigung':'Hören','':'—'}
+    };
+    var d = el.dataset;
+    var rows = [
+        ['Geschlecht', labels.gender[d.gender] || d.gender || '—'],
+        ['Schulform', labels.schulform[d.schulform] || d.schulform || '—'],
+        ['Wohnort', d.wohnort || '—'],
+        ['Religion', labels.religion[d.religion] || d.religion || '—'],
+        ['Sportklasse', d.sportInteresse === '1' ? '✓ Ja' : 'Nein'],
+        ['IKL', d.ikl === '1' ? '✓ Ja' : 'Nein'],
+        ['Förderbedarf', labels.special_needs[d.specialNeeds] || (d.specialNeeds ? d.specialNeeds : 'Keiner')],
+        ['Notizen', d.notes || '—']
+    ];
+    document.getElementById('sm-name').textContent = d.studentName || '—';
+    var html = '';
+    rows.forEach(function(r) {
+        html += '<tr style="border-bottom:1px solid #f0f0f0;">' +
+            '<td style="padding:0.5rem 0.75rem 0.5rem 0; color:#666; white-space:nowrap; width:40%;">' + r[0] + '</td>' +
+            '<td style="padding:0.5rem 0;">' + (r[1] || '—') + '</td></tr>';
+    });
+    document.getElementById('sm-body').innerHTML = html;
+    var modal = document.getElementById('student-info-modal');
+    modal.style.display = 'flex';
+}
+function closeStudentModal() {
+    document.getElementById('student-info-modal').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeStudentModal();
+});
+</script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 ═══════════════════════════════════════════════════════════════════════════
   KLASSENEINTEILUNG - PORTABLE VERSION FÜR WINDOWS 11
   Keine Installation • Keine Admin-Rechte • Komplett Portabel
-  Version 0.1.30 - Security Hardened Edition
+  Version 0.1.31 - Security Hardened Edition
 ═══════════════════════════════════════════════════════════════════════════
 
 ✅ VORTEILE DIESER VERSION:
@@ -85,7 +85,7 @@
   1. Ersetzen Sie "klasseneinteilung.db" mit Ihrer Sicherung
 
 
-🔒 SICHERHEIT (v0.1.30 - Security Hardened):
+🔒 SICHERHEIT (v0.1.31 - Security Hardened):
 ──────────────────────────────────────────────────────────────────────────
   ✓ Zufällig generiertes 16-Zeichen Initial-Passwort
   ✓ Kryptographisch sicherer SECRET_KEY
@@ -210,7 +210,7 @@
   Bei Fragen oder Problemen:
   Tobias Meier
   Email: admin(at)secutobs.com
-  Version: 0.1.30 - Security Hardened Edition
+  Version: 0.1.31 - Security Hardened Edition
 
 
 ═══════════════════════════════════════════════════════════════════════════

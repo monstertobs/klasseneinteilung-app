@@ -6,6 +6,18 @@
 
 ---
 
+## Version 0.1.31 - Schüler-Info per Klick
+**Release Date:** 20. April 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature
+- **Schüler-Info Modal:** Klick auf einen Schüler in der Klassen-Übersicht zeigt ein Info-Fenster mit Name, Geschlecht, Schulform, Wohnort, Religion, Sportklasse, IKL, Förderbedarf und Notizen — ohne etwas zu verändern
+- Verfügbar in gespeicherten Einteilungen (Ansehen) sowie in der Vorschau beim Generieren
+- Im Bearbeitungsmodus bleibt das Klicken für Drag & Drop reserviert
+
+---
+
 ## Version 0.1.30 - Bugfix Einteilung-Bearbeiten + Sportklasse-Logik
 **Release Date:** 20. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
@@ -479,5 +491,5 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Last Updated:** 19. April 2026
-**Current Version:** 0.1.30
+**Current Version:** 0.1.31
 **Maintained By:** Tobias Meier <admin(at)secutobs.com>
