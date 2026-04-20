@@ -22,7 +22,17 @@
                 <li><a href="{{ url_for('students') }}" {% if request.endpoint in ['students', 'add_student'] %}class="active"{% endif %}>Sch&uuml;ler</a></li>
                 <li><a href="{{ url_for('wishes') }}" {% if request.endpoint in ['wishes', 'add_wish'] %}class="active"{% endif %}>Elternw&uuml;nsche</a></li>
                 <li><a href="{{ url_for('generate') }}" {% if request.endpoint == 'generate' %}class="active"{% endif %}>Einteilung</a></li>
-                {% if session.is_admin %}<li><a href="{{ url_for('users') }}" {% if request.endpoint in ['users', 'add_user'] %}class="active"{% endif %}>Benutzer</a></li>{% endif %}
+                {% if session.is_admin %}
+                <li>
+                    <a href="{{ url_for('users') }}" {% if request.endpoint in ['users', 'add_user'] %}class="active"{% endif %} style="position:relative;">
+                        Benutzer
+                        {%- set pending = namespace(count=0) -%}
+                        {%- if g.pending_users_count is defined and g.pending_users_count > 0 -%}
+                        <span style="position:absolute; top:-6px; right:-14px; background:#ef4444; color:#fff; font-size:0.65rem; font-weight:700; border-radius:99px; padding:1px 5px; line-height:1.4;">{{ g.pending_users_count }}</span>
+                        {%- endif -%}
+                    </a>
+                </li>
+                {% endif %}
                 <li><a href="{{ url_for('check_update') }}" {% if request.endpoint in ['check_update', 'apply_update', 'rollback_update'] %}class="active"{% endif %}>Update</a></li>
                 <li><a href="{{ url_for('algorithm') }}" {% if request.endpoint == 'algorithm' %}class="active"{% endif %}>Algorithmus</a></li>
                 <li><a href="{{ url_for('about') }}" {% if request.endpoint == 'about' %}class="active"{% endif %}>&Uuml;ber</a></li>
@@ -155,7 +165,7 @@
             <p>
                 &copy; 2026 Tobias Meier &middot;
                 <a href="mailto:admin(at)secutobs.com" style="color: inherit; text-decoration: none;">admin(at)secutobs.com</a> &middot;
-                Klasseneinteilung v0.1.32 &middot;
+                Klasseneinteilung v0.1.33 &middot;
                 DSGVO-konform &middot;
                 Lokale Datenspeicherung
             </p>

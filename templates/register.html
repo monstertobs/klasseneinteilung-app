@@ -5,6 +5,26 @@
 {% block content %}
 <div class="login-container">
     <div class="login-box">
+
+        {% if pending %}
+        <!-- Warte-auf-Freischaltung-Zustand -->
+        <div style="text-align:center; padding:0.5rem 0 1.5rem;">
+            <div style="font-size:3rem; margin-bottom:0.75rem;">&#9203;</div>
+            <h2 style="margin:0 0 0.5rem 0;">Registrierung eingegangen</h2>
+            <p style="color:#555; margin:0 0 1.25rem 0;">
+                Ihr Konto <strong>{{ registered_username }}</strong> wurde angelegt und
+                wartet auf die Freischaltung durch einen Administrator.
+            </p>
+            <div style="background:#fff8e1; border:1px solid #f59e0b; border-radius:10px; padding:1rem 1.25rem; text-align:left; font-size:0.9rem; color:#7c5a00; margin-bottom:1.5rem;">
+                <strong>Was passiert als n&auml;chstes?</strong><br>
+                Ein Administrator schaltet Ihr Konto frei. Danach k&ouml;nnen Sie sich
+                mit Ihrem Benutzernamen und Passwort anmelden.
+            </div>
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-block">Zur Anmeldung</a>
+        </div>
+
+        {% else %}
+        <!-- Registrierungsformular -->
         <div class="login-header">
             <h2>Klasseneinteilung</h2>
             <p>Neues Konto erstellen</p>
@@ -29,8 +49,13 @@
             </div>
 
             <div class="form-group">
-                <label for="password_confirm">Passwort bestätigen</label>
+                <label for="password_confirm">Passwort best&auml;tigen</label>
                 <input type="password" id="password_confirm" name="password_confirm" class="form-control" required>
+            </div>
+
+            <div style="background:#f0f4ff; border:1px solid #c7d2fe; border-radius:10px; padding:0.85rem 1rem; font-size:0.85rem; color:#3730a3; margin-bottom:1rem;">
+                &#8505;&#65039; Nach der Registrierung muss ein Administrator Ihr Konto freischalten,
+                bevor Sie die App nutzen k&ouml;nnen.
             </div>
 
             <button type="submit" class="btn btn-primary btn-block">Konto erstellen</button>
@@ -39,6 +64,8 @@
         <div style="text-align:center; margin-top:1.25rem; color:#86868b; font-size:0.9rem;">
             Bereits ein Konto? <a href="{{ url_for('login') }}">Anmelden</a>
         </div>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

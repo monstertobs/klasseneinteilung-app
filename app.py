@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.32
+Version: 0.1.33
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 20. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.32'
+__version__ = '0.1.33'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -47,7 +47,7 @@ import secrets
 import string
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -113,16 +113,44 @@ limiter = Limiter(
 )
 
 IDLE_TIMEOUT_MINUTES = 15  # Automatischer Logout nach X Minuten Inaktivität
+ONLINE_THRESHOLD_SECONDS = 5 * 60  # 5 Minuten = "online"
+
+# In-Memory-Tracker: {user_id: datetime} — wird bei jedem Request aktualisiert
+_online_users: dict = {}
 
 @app.before_request
 def check_idle_timeout():
-    """Automatischer Logout nach IDLE_TIMEOUT_MINUTES Minuten Inaktivität"""
+    """Automatischer Logout nach IDLE_TIMEOUT_MINUTES Minuten Inaktivität.
+    Prüft außerdem ob der Account noch freigeschaltet ist."""
     if 'user_id' not in session:
         return
-    if request.endpoint in ('static', 'login', 'logout'):
+    if request.endpoint in ('static', 'login', 'logout', 'register'):
         return
-    last_activity = session.get('last_activity')
+
     now = datetime.now()
+
+    # Online-Status aktualisieren
+    _online_users[session['user_id']] = now
+
+    # Freischaltungs-Check (einmal pro Request, leichtgewichtig)
+    db = get_main_db()
+    if not session.get('is_admin'):
+        row = db.execute('SELECT is_approved FROM users WHERE id = ?',
+                         (session['user_id'],)).fetchone()
+        if row and not row['is_approved']:
+            db.close()
+            session.clear()
+            flash('Ihr Konto wurde noch nicht freigeschaltet oder wurde gesperrt.', 'warning')
+            return redirect(url_for('login'))
+        # Pending-Count nicht nötig für normale User
+        g.pending_users_count = 0
+    else:
+        # Admin: Anzahl ausstehender Freischaltungen für Navbar-Badge
+        row = db.execute('SELECT COUNT(*) FROM users WHERE is_approved = 0').fetchone()
+        g.pending_users_count = row[0] if row else 0
+    db.close()
+
+    last_activity = session.get('last_activity')
     if last_activity:
         idle_seconds = (now - datetime.fromisoformat(last_activity)).total_seconds()
         if idle_seconds > IDLE_TIMEOUT_MINUTES * 60:
@@ -322,9 +350,21 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            is_approved INTEGER NOT NULL DEFAULT 1,
+            last_login TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Spalten-Migration für bestehende users-Tabellen
+    for col, coldef in [
+        ('is_approved', 'INTEGER NOT NULL DEFAULT 1'),
+        ('last_login', 'TIMESTAMP'),
+    ]:
+        try:
+            cursor.execute(f'ALTER TABLE users ADD COLUMN {col} {coldef}')
+        except sqlite3.OperationalError:
+            pass
 
     # Standard-Admin-User erstellen (falls nicht vorhanden)
     cursor.execute('SELECT * FROM users WHERE username = ?', ('admin',))
@@ -463,14 +503,23 @@ def login():
         db.close()
 
         if user and check_password_hash(user['password_hash'], password):
+            if not user['is_approved']:
+                flash('Ihr Konto wartet noch auf die Freischaltung durch den Administrator.', 'warning')
+                return render_template('login.html', initial_password=None)
             init_user_db(user['id'])  # DB anlegen falls noch nicht vorhanden
-            session.clear()  # Alte Session-Daten löschen
+            # last_login aktualisieren
+            db2 = get_main_db()
+            db2.execute('UPDATE users SET last_login = ? WHERE id = ?',
+                        (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user['id']))
+            db2.commit()
+            db2.close()
+            session.clear()
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['is_admin'] = (user['username'] == 'admin')
             session.permanent = True
             session.modified = True
-            # Temporäre Passwort-Datei nach erstem Login löschen
+            _online_users[user['id']] = datetime.now()
             if os.path.exists('.initial_password'):
                 os.remove('.initial_password')
             flash('Erfolgreich angemeldet!', 'success')
@@ -533,22 +582,18 @@ def register():
                         flash('Dieser Benutzername ist bereits vergeben.', 'danger')
                     else:
                         password_hash = generate_password_hash(password, method='pbkdf2:sha256')
-                        cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
-                                       (username, password_hash))
+                        # is_approved=0: neuer User wartet auf Admin-Freischaltung
+                        cursor.execute(
+                            'INSERT INTO users (username, password_hash, is_approved) VALUES (?, ?, 0)',
+                            (username, password_hash)
+                        )
                         db.commit()
                         new_id = cursor.lastrowid
                         db.close()
                         init_user_db(new_id)
-                        session.clear()
-                        session['user_id'] = new_id
-                        session['username'] = username
-                        session['is_admin'] = False
-                        session.permanent = True
-                        session['last_activity'] = datetime.now().isoformat()
-                        flash(f'Willkommen, {username}! Ihr Konto wurde erstellt.', 'success')
-                        return redirect(url_for('dashboard'))
+                        return render_template('register.html', pending=True, registered_username=username)
 
-    return render_template('register.html')
+    return render_template('register.html', pending=False)
 
 
 @app.route('/dashboard')
@@ -3572,16 +3617,17 @@ def assignment_transparency(assignment_id):
 @app.route('/users')
 @admin_required
 def users():
-    """Benutzerverwaltung mit DB-Statistiken"""
+    """Benutzerverwaltung mit DB-Statistiken, Online-Status und Freischaltung"""
     db = get_main_db()
     cursor = db.cursor()
-    cursor.execute('SELECT id, username, created_at FROM users ORDER BY username')
+    cursor.execute('SELECT id, username, is_approved, last_login, created_at FROM users ORDER BY username')
     users_raw = cursor.fetchall()
     db.close()
 
-    # Statistiken pro Nutzer aus jeweiliger User-DB ermitteln
+    now = datetime.now()
     users_list = []
     for u in users_raw:
+        # DB-Statistiken
         stats = {'students': 0, 'assignments': 0}
         db_path = get_user_db_path(u['id'])
         if os.path.exists(db_path):
@@ -3595,11 +3641,18 @@ def users():
                 udb.close()
             except Exception:
                 pass
+        # Online-Status: letzter Seitenaufruf ≤ 5 Minuten
+        last_seen = _online_users.get(u['id'])
+        is_online = (last_seen is not None and
+                     (now - last_seen).total_seconds() <= ONLINE_THRESHOLD_SECONDS)
         d = dict(u)
         d['stats'] = stats
+        d['is_online'] = is_online
+        d['last_seen'] = last_seen.strftime('%d.%m.%Y %H:%M') if last_seen else None
         users_list.append(d)
 
-    return render_template('users.html', users=users_list)
+    pending_count = sum(1 for u in users_list if not u['is_approved'])
+    return render_template('users.html', users=users_list, pending_count=pending_count)
 
 @app.route('/users/add', methods=['GET', 'POST'])
 @admin_required
@@ -3635,13 +3688,16 @@ def add_user():
                     flash('Benutzername existiert bereits.', 'danger')
                 else:
                     password_hash = generate_password_hash(password, method='pbkdf2:sha256')
-                    cursor.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
-                                   (username, password_hash))
+                    # Admin-erstellte User sind sofort freigeschaltet
+                    cursor.execute(
+                        'INSERT INTO users (username, password_hash, is_approved) VALUES (?, ?, 1)',
+                        (username, password_hash)
+                    )
                     db.commit()
                     new_id = cursor.lastrowid
                     db.close()
                     init_user_db(new_id)
-                    flash(f'Benutzer {username} wurde erstellt.', 'success')
+                    flash(f'Benutzer {username} wurde erstellt und ist sofort freigeschaltet.', 'success')
                     return redirect(url_for('users'))
 
     db.close()
@@ -3671,6 +3727,35 @@ def delete_user(user_id):
 
     flash('Benutzer und zugehörige Daten wurden gelöscht.', 'success')
     return redirect(url_for('users'))
+
+
+@app.route('/users/approve/<int:user_id>', methods=['POST'])
+@admin_required
+def approve_user(user_id):
+    """Benutzer freischalten oder sperren"""
+    if user_id == session['user_id']:
+        flash('Sie können Ihren eigenen Account nicht sperren.', 'danger')
+        return redirect(url_for('users'))
+
+    db = get_main_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT username, is_approved FROM users WHERE id = ?', (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        db.close()
+        flash('Benutzer nicht gefunden.', 'danger')
+        return redirect(url_for('users'))
+
+    # Umschalten
+    new_status = 0 if user['is_approved'] else 1
+    cursor.execute('UPDATE users SET is_approved = ? WHERE id = ?', (new_status, user_id))
+    db.commit()
+    db.close()
+
+    action = 'freigeschaltet' if new_status else 'gesperrt'
+    flash(f'Benutzer {user["username"]} wurde {action}.', 'success')
+    return redirect(url_for('users'))
+
 
 @app.route('/users/reset-password/<int:user_id>', methods=['POST'])
 @admin_required

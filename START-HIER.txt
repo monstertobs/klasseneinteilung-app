@@ -55,7 +55,7 @@
      • Großbuchstaben, Kleinbuchstaben, Ziffern
 
 
-  🔒 SICHERHEIT (v0.1.32 - Import Validation):
+  🔒 SICHERHEIT (v0.1.33 - Import Validation):
   ───────────────────────────────────────────────────────────────────────────
   ✓ Zufällig generiertes Initial-Passwort (16 Zeichen)
   ✓ Kryptographisch sichere Schlüssel (SECRET_KEY)

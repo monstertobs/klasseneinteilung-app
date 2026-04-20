@@ -6,48 +6,96 @@
 <div class="page-header">
     <div>
         <h2>Benutzerverwaltung</h2>
-        <p>{{ users|length }} Benutzer &mdash; jeder mit eigener Datenbank</p>
+        <p>{{ users|length }} Benutzer
+            {% if pending_count > 0 %}
+            &mdash; <span style="color:#d97706; font-weight:600;">{{ pending_count }} warten auf Freischaltung</span>
+            {% endif %}
+        </p>
     </div>
     <a href="{{ url_for('add_user') }}" class="btn btn-primary">Benutzer hinzuf&uuml;gen</a>
 </div>
+
+{% if pending_count > 0 %}
+<div style="background:#fff8e1; border:1px solid #f59e0b; border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.5rem; display:flex; align-items:center; gap:0.75rem;">
+    <span style="font-size:1.5rem;">&#9888;&#65039;</span>
+    <span><strong>{{ pending_count }} Konto{{ 'konten' if pending_count != 1 else '' }} warte{{ 't' if pending_count == 1 else 'n' }} auf Freischaltung.</strong>
+    Bitte prüfen und freischalten.</span>
+</div>
+{% endif %}
 
 <div class="table-container">
     <table class="data-table">
         <thead>
             <tr>
-                <th>Nr.</th>
-                <th>Benutzername</th>
-                <th>Erstellt am</th>
-                <th style="text-align:center;">Sch&uuml;ler</th>
-                <th style="text-align:center;">Einteilungen</th>
+                <th>Benutzer</th>
+                <th style="text-align:center;">Status</th>
+                <th class="hide-mobile">Registriert</th>
+                <th class="hide-mobile">Letzter Login</th>
+                <th style="text-align:center;" class="hide-mobile">Sch&uuml;ler</th>
+                <th style="text-align:center;" class="hide-mobile">Einteilungen</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
         <tbody>
             {% for user in users %}
-            <tr>
-                <td>{{ loop.index }}</td>
+            <tr {% if not user.is_approved %}style="background:#fffbeb;"{% endif %}>
                 <td>
-                    <strong>{{ user.username }}</strong>
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        {% if user.is_online %}
+                        <span title="Gerade online" style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22c55e; flex-shrink:0;"></span>
+                        {% else %}
+                        <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#d1d5db; flex-shrink:0;"></span>
+                        {% endif %}
+                        <strong>{{ user.username }}</strong>
+                        {% if user.username == 'admin' %}
+                        <span class="badge badge-dark">Admin</span>
+                        {% endif %}
+                        {% if user.id == session.user_id %}
+                        <span class="badge badge-info">Sie</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td style="text-align:center;">
                     {% if user.username == 'admin' %}
-                    <span class="badge badge-dark">Admin</span>
-                    {% endif %}
-                    {% if user.id == session.user_id %}
-                    <span class="badge badge-info">Sie</span>
+                    <span class="badge badge-success">Aktiv</span>
+                    {% elif user.is_approved %}
+                    <span class="badge badge-success">Freigeschaltet</span>
+                    {% else %}
+                    <span class="badge badge-warning" style="background:#f59e0b; color:#fff;">Ausstehend</span>
                     {% endif %}
                 </td>
-                <td>{{ user.created_at }}</td>
-                <td style="text-align:center;">{{ user.stats.students }}</td>
-                <td style="text-align:center;">{{ user.stats.assignments }}</td>
+                <td class="hide-mobile">{{ user.created_at }}</td>
+                <td class="hide-mobile">
+                    {% if user.last_login %}
+                    {{ user.last_login }}
+                    {% else %}
+                    <span style="color:#86868b;">Noch nie</span>
+                    {% endif %}
+                </td>
+                <td style="text-align:center;" class="hide-mobile">{{ user.stats.students }}</td>
+                <td style="text-align:center;" class="hide-mobile">{{ user.stats.assignments }}</td>
                 <td>
-                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        {% if user.username != 'admin' and user.id != session.user_id %}
+                        <form method="POST" action="{{ url_for('approve_user', user_id=user.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {% if user.is_approved %}
+                            <button type="submit" class="btn btn-secondary btn-sm"
+                                    onclick="return confirm('Benutzer \u00bb{{ user.username }}\u00ab sperren?')"
+                                    title="Zugang sperren">Sperren</button>
+                            {% else %}
+                            <button type="submit" class="btn btn-primary btn-sm"
+                                    title="Konto freischalten">Freischalten</button>
+                            {% endif %}
+                        </form>
+                        {% endif %}
                         <button class="btn btn-secondary btn-sm"
                                 onclick="openResetModal({{ user.id }}, '{{ user.username }}')">
-                            Passwort&nbsp;setzen
+                            Passwort
                         </button>
                         {% if user.id != session.user_id %}
                         <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="inline-form"
-                              onsubmit="return confirm('Benutzer \u00bb{{ user.username }}\u00ab und ALLE zugehörigen Daten wirklich l\u00f6schen?');">
+                              onsubmit="return confirm('Benutzer \u00bb{{ user.username }}\u00ab und ALLE Daten wirklich l\u00f6schen?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
                         </form>
@@ -60,15 +108,14 @@
     </table>
 </div>
 
-<div class="info-box" style="margin-top: 1.5rem;">
-    <h4>Hinweise zur Benutzerverwaltung</h4>
+<div class="info-box" style="margin-top:1.5rem;">
+    <h4>Hinweise</h4>
     <ul>
-        <li>Jeder Benutzer hat eine <strong>eigene, isolierte Datenbank</strong> &mdash; Daten sind vollst&auml;ndig getrennt</li>
-        <li>Neue Benutzer k&ouml;nnen sich selbst &uuml;ber die <a href="{{ url_for('register') }}">Registrierungsseite</a> anmelden</li>
-        <li><strong>Passwort setzen</strong> setzt das Passwort direkt &mdash; das alte Passwort wird nicht ben&ouml;tigt</li>
-        <li>Beim L&ouml;schen eines Benutzers werden <strong>alle seine Daten unwiderruflich gel&ouml;scht</strong></li>
-        <li>Sie k&ouml;nnen sich nicht selbst l&ouml;schen</li>
-        <li>Eigenes Passwort &auml;ndern (mit aktuellem Passwort): <a href="{{ url_for('change_password') }}">Passwort&auml;ndern-Seite</a></li>
+        <li>Selbst registrierte Benutzer m&uuml;ssen manuell <strong>freigeschaltet</strong> werden</li>
+        <li>Jeder Benutzer hat eine <strong>eigene, isolierte Datenbank</strong> (DSGVO-konform)</li>
+        <li><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22c55e; vertical-align:middle;"></span> = in den letzten 5 Minuten aktiv</li>
+        <li>Beim L&ouml;schen werden <strong>alle Daten des Benutzers unwiderruflich gel&ouml;scht</strong></li>
+        <li>Eigenes Passwort &auml;ndern: <a href="{{ url_for('change_password') }}">Passwort&auml;ndern-Seite</a></li>
     </ul>
 </div>
 
@@ -91,7 +138,7 @@
                            placeholder="Mind. 8 Zeichen, Groß-/Kleinbuchst., Zahl">
                 </div>
                 <div style="margin-bottom:1.25rem;">
-                    <label style="display:block; font-weight:600; margin-bottom:0.4rem;">Passwort bestätigen</label>
+                    <label style="display:block; font-weight:600; margin-bottom:0.4rem;">Passwort best&auml;tigen</label>
                     <input type="password" name="new_password_confirm" class="form-control" required minlength="8">
                 </div>
                 <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
