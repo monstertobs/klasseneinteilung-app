@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.34
+Version: 0.1.35
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 20. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.34'
+__version__ = '0.1.35'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -729,10 +729,10 @@ def add_student():
             cursor = db.cursor()
             cursor.execute('''
                 INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
-                                     sport_interesse, musik_interesse, theater_interesse, special_needs, ikl, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     sport_interesse, musik_interesse, theater_interesse, special_needs, ikl, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (firstname, lastname, gender, wohnort, schulform, religion, sportlich,
-                  sport_interesse, 0, 0, special_needs, ikl, notes, session['user_id']))
+                  sport_interesse, 0, 0, special_needs, ikl, notes))
             db.commit()
             db.close()
 
@@ -1071,8 +1071,8 @@ def process_import_data(data, batch_id):
 
             # In Datenbank einfügen (trotz Duplikat, wird später überprüft)
             cursor.execute('''
-                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, sport_interesse, special_needs, notes, created_by, import_batch_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, sport_interesse, special_needs, notes, import_batch_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 firstname,
                 lastname,
@@ -1084,7 +1084,6 @@ def process_import_data(data, batch_id):
                 student_data.get('sport_interesse', 0),
                 student_data.get('special_needs', ''),
                 student_data.get('notes', ''),
-                session['user_id'],
                 batch_id
             ))
 
@@ -1469,11 +1468,11 @@ def generate_testdata():
             INSERT INTO students
                 (firstname, lastname, gender, wohnort, schulform, religion,
                  sportlich, sport_interesse, special_needs, notes,
-                 created_by, import_batch_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 import_batch_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (vorname, nachname, geschlecht, wohnort, schulform, religion,
               sportlich, sport_interesse, special_needs, notes,
-              session['user_id'], batch_id))
+              batch_id))
 
         student_ids.append(cursor.lastrowid)
 
