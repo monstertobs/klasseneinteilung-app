@@ -60,21 +60,21 @@
                     onclick="analyzeWithKI()" {% if not ki_available %}disabled{% endif %}>
                 KI analysieren
             </button>
-
-            <!-- KI-Ergebnis Vorschau -->
-            <div id="ki_result" style="display:none; margin-top:1.25rem; padding:1rem; background:#f8f9fa; border-radius:10px; border:1px solid #e0e0e0;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
-                    <strong style="color:#1d1d1f;">KI-Vorschlag</strong>
-                    <button type="button" class="btn btn-success btn-sm" onclick="applyKiResult()">
-                        Vorschlag übernehmen
-                    </button>
-                </div>
-                <div id="ki_result_text" style="font-size:0.875rem; color:#444;"></div>
-            </div>
-
-            <div id="ki_error" style="display:none; margin-top:0.75rem;" class="alert alert-danger"></div>
         </div>
     </div>
+
+    <!-- KI-Ergebnis und Fehler: außerhalb des versteckten Bereichs, immer im DOM -->
+    <div id="ki_result" style="display:none; margin-bottom:1.5rem; padding:1rem; background:#f8f9fa; border-radius:10px; border:1px solid #e0e0e0;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+            <strong style="color:#1d1d1f;">KI-Vorschlag</strong>
+            <button type="button" class="btn btn-success btn-sm" onclick="applyKiResult()">
+                Vorschlag übernehmen
+            </button>
+        </div>
+        <div id="ki_result_text" style="font-size:0.875rem; color:#444;"></div>
+    </div>
+
+    <div id="ki_error" style="display:none; margin-bottom:1rem;" class="alert alert-danger"></div>
 
     <!-- Manuelle Konfiguration -->
     <div class="card" style="margin-bottom:1.5rem;">
