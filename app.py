@@ -284,7 +284,9 @@ def _ki_analyze_text(text):
         raise RuntimeError('KI nicht konfiguriert: weder GEMINI_API_KEY noch KI_PROXY_URL gesetzt.')
 
     except Exception as exc:
-        raise RuntimeError(f'KI-Analyse fehlgeschlagen: {exc}') from exc
+        # API-Key aus Fehlermeldung entfernen
+        msg = str(exc).replace(GEMINI_API_KEY, '***') if GEMINI_API_KEY else str(exc)
+        raise RuntimeError(f'KI-Analyse fehlgeschlagen: {msg}') from exc
 
 
 def init_user_db(user_id):
