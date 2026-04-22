@@ -200,41 +200,47 @@ if (kiText) {
 let kiResultData = null;
 
 async function analyzeWithKI() {
-    const text = document.getElementById('ki_text').value.trim();
-    if (!text) {
-        alert('Bitte geben Sie eine Beschreibung ein.');
-        return;
-    }
     const btn = document.getElementById('ki_analyze_btn');
-    const resultDiv = document.getElementById('ki_result');
-    const errorDiv = document.getElementById('ki_error');
-
-    btn.disabled = true;
-    btn.textContent = 'Analysiere…';
-    resultDiv.style.display = 'none';
-    errorDiv.style.display = 'none';
+    if (btn) { btn.disabled = true; btn.textContent = 'Analysiere\u2026'; }
 
     try {
+        const textEl = document.getElementById('ki_text');
+        const text = textEl ? textEl.value.trim() : '';
+        if (!text) { alert('Bitte geben Sie eine Beschreibung ein.'); return; }
+
+        const resultDiv = document.getElementById('ki_result');
+        const errorDiv  = document.getElementById('ki_error');
+        if (resultDiv) resultDiv.style.display = 'none';
+        if (errorDiv)  errorDiv.style.display  = 'none';
+
+        const csrfEl = document.querySelector('[name=csrf_token]');
         const resp = await fetch('{{ url_for("school_config_ki_analyze") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrf_token]').value,
+                'X-CSRFToken': csrfEl ? csrfEl.value : '',
             },
             body: JSON.stringify({ text }),
         });
-        const data = await resp.json();
+
+        let data;
+        try { data = await resp.json(); } catch(e) { data = {}; }
+
         if (!resp.ok || data.error) {
-            throw new Error(data.error || 'Unbekannter Fehler');
+            throw new Error(data.error || ('HTTP ' + resp.status));
         }
         kiResultData = data.config;
         showKiResult(data.config);
     } catch (err) {
-        errorDiv.textContent = 'Fehler: ' + err.message;
-        errorDiv.style.display = '';
+        const errorDiv = document.getElementById('ki_error');
+        if (errorDiv) {
+            errorDiv.textContent = 'Fehler: ' + err.message;
+            errorDiv.style.display = '';
+        } else {
+            alert('Fehler: ' + err.message);
+        }
     } finally {
-        btn.disabled = false;
-        btn.textContent = 'KI analysieren';
+        if (btn) { btn.disabled = false; btn.textContent = 'KI analysieren'; }
     }
 }
 
