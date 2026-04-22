@@ -266,7 +266,7 @@ def _ki_analyze_text(text):
             # Direkt: Gemini REST API aufrufen
             url = (
                 'https://generativelanguage.googleapis.com/v1beta/models/'
-                f'gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}'
+                f'gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}'
             )
             payload = {
                 'contents': [{'parts': [{'text': prompt}]}],
@@ -4046,7 +4046,7 @@ def api_ki_config():
         import requests as _req, json as _json, re as _re
         url = (
             'https://generativelanguage.googleapis.com/v1beta/models/'
-            f'gemini-2.0-flash-lite:generateContent?key={GEMINI_API_KEY}'
+            f'gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}'
         )
         prompt = (
             "Du bist ein Schulverwaltungs-Assistent. Analysiere die folgende Schulbeschreibung "
