@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.36
+Version: 0.1.37
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 20. April 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.36'
+__version__ = '0.1.37'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -115,6 +115,11 @@ limiter = Limiter(
 IDLE_TIMEOUT_MINUTES = 15  # Automatischer Logout nach X Minuten Inaktivität
 ONLINE_THRESHOLD_SECONDS = 5 * 60  # 5 Minuten = "online"
 
+# KI-Assistent Konfiguration
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+KI_PROXY_URL = os.environ.get('KI_PROXY_URL', '')      # Für Stick: URL zu klassenwahl.de/api/ki-config
+KI_PROXY_TOKEN = os.environ.get('KI_PROXY_TOKEN', '')  # Shared Secret für Proxy-Endpunkt
+
 # In-Memory-Tracker: {user_id: datetime} — wird bei jedem Request aktualisiert
 _online_users: dict = {}
 
@@ -202,6 +207,86 @@ def get_db():
     db.text_factory = str
     return db
 
+def get_school_config():
+    """Schul-Konfiguration aus DB laden (gibt immer ein dict zurück)"""
+    defaults = {
+        'ki_enabled': 0, 'gender_balance': 1, 'parent_wishes': 1,
+        'religion_distribute': 1, 'religion_group': 0, 'religion_bundle': 0,
+        'ib_min': 2, 'ib_max': 5, 'ib_class_size': 22, 'config_source': 'manual',
+    }
+    try:
+        db = get_db()
+        row = db.execute('SELECT * FROM school_config WHERE id = 1').fetchone()
+        db.close()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+    return defaults
+
+
+def _ki_analyze_text(text):
+    """Sendet Schulbeschreibung an Gemini (direkt oder via Proxy) und gibt Config-Dict zurück."""
+    import json as _json
+    import re as _re
+
+    prompt = (
+        "Du bist ein Schulverwaltungs-Assistent. Analysiere die folgende Schulbeschreibung "
+        "und erstelle eine JSON-Konfiguration fuer einen Klasseneinteilungs-Algorithmus.\n\n"
+        f"Schulbeschreibung: {text}\n\n"
+        "Antworte NUR mit einem JSON-Objekt mit diesen Feldern:\n"
+        "- gender_balance (true/false): Geschlechterbalance priorisieren\n"
+        "- parent_wishes (true/false): Elternwuensche beruecksichtigen\n"
+        "- religion_distribute (true/false): Religion gleichmaessig verteilen\n"
+        "- religion_group (true/false): Gleichreligioese Schueler zusammenhalten\n"
+        "- religion_bundle (true/false): Religion in einzelne Klassen buendeln\n"
+        "- ib_min (Ganzzahl 0-5): Mindestanzahl IB-Schueler pro Klasse (0=keine IB)\n"
+        "- ib_max (Ganzzahl 0-10): Maximum IB-Schueler pro Klasse (0=keine Beschraenkung)\n"
+        "- ib_class_size (Ganzzahl 15-25): Klassengroesse fuer IB-Klassen\n\n"
+        "Hinweis: religion_distribute, religion_group und religion_bundle schliessen "
+        "sich gegenseitig aus – hoechstens eines davon true.\n"
+        "Antworte ausschliesslich mit validem JSON, keine Erklaerungen."
+    )
+
+    try:
+        import requests as _req
+
+        if KI_PROXY_URL:
+            # Portable Stick: Anfrage an klassenwahl.de weiterleiten
+            resp = _req.post(
+                KI_PROXY_URL,
+                json={'text': text},
+                headers={'X-KI-Token': KI_PROXY_TOKEN},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        if GEMINI_API_KEY:
+            # Direkt: Gemini REST API aufrufen
+            url = (
+                'https://generativelanguage.googleapis.com/v1beta/models/'
+                f'gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}'
+            )
+            payload = {
+                'contents': [{'parts': [{'text': prompt}]}],
+                'generationConfig': {'temperature': 0.1},
+            }
+            resp = _req.post(url, json=payload, timeout=30)
+            resp.raise_for_status()
+            raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
+            # JSON aus der Antwort extrahieren (auch wenn Gemini Markdown zurückgibt)
+            match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+            if match:
+                return _json.loads(match.group())
+            return _json.loads(raw)
+
+        raise RuntimeError('KI nicht konfiguriert: weder GEMINI_API_KEY noch KI_PROXY_URL gesetzt.')
+
+    except Exception as exc:
+        raise RuntimeError(f'KI-Analyse fehlgeschlagen: {exc}') from exc
+
+
 def init_user_db(user_id):
     """Schema für die benutzerspezifische Datenbank anlegen / migrieren"""
     db_path = get_user_db_path(user_id)
@@ -264,6 +349,24 @@ def init_user_db(user_id):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS school_config (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            ki_enabled INTEGER DEFAULT 0,
+            gender_balance INTEGER DEFAULT 1,
+            parent_wishes INTEGER DEFAULT 1,
+            religion_distribute INTEGER DEFAULT 1,
+            religion_group INTEGER DEFAULT 0,
+            religion_bundle INTEGER DEFAULT 0,
+            ib_min INTEGER DEFAULT 2,
+            ib_max INTEGER DEFAULT 5,
+            ib_class_size INTEGER DEFAULT 22,
+            config_source TEXT DEFAULT 'manual',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('INSERT OR IGNORE INTO school_config (id) VALUES (1)')
 
     db.commit()
     db.close()
@@ -1740,17 +1843,18 @@ def generate():
             'ib_class_size': ib_class_size,
         }
     else:
+        sc = get_school_config()
         options = {
-            'gender_balance': True,
-            'parent_wishes': True,
-            'religion_distribute': True,
-            'religion_group': False,
-            'religion_bundle': False,
+            'gender_balance':      bool(sc.get('gender_balance', 1)),
+            'parent_wishes':       bool(sc.get('parent_wishes', 1)),
+            'religion_distribute': bool(sc.get('religion_distribute', 1)),
+            'religion_group':      bool(sc.get('religion_group', 0)),
+            'religion_bundle':     bool(sc.get('religion_bundle', 0)),
             'sportklasse': False,
             'specialized_classes': {'sport': 0, 'custom': 0, 'custom_name': ''},
-            'ib_min': 2,
-            'ib_max': 5,
-            'ib_class_size': 22,
+            'ib_min':        sc.get('ib_min', 2),
+            'ib_max':        sc.get('ib_max', 5),
+            'ib_class_size': sc.get('ib_class_size', 22),
         }
 
     # Basis-Einteilung laden (falls angegeben)
@@ -3830,6 +3934,141 @@ def change_password():
         return redirect(url_for('dashboard'))
 
     return render_template('change_password.html')
+
+# ── KI-Assistent & Schul-Konfiguration ──────────────────────────────────────
+
+@app.route('/school-config', methods=['GET', 'POST'])
+@admin_required
+def school_config():
+    """Schul-Konfiguration: manuelle Einstellungen + optionaler KI-Assistent"""
+    if request.method == 'POST':
+        ki_enabled = 1 if request.form.get('ki_enabled') else 0
+        gender_balance = 1 if request.form.get('gender_balance') else 0
+        parent_wishes = 1 if request.form.get('parent_wishes') else 0
+        religion_distribute = 1 if request.form.get('religion_distribute') else 0
+        religion_group = 1 if request.form.get('religion_group') else 0
+        religion_bundle = 1 if request.form.get('religion_bundle') else 0
+        ib_min = max(0, min(5, int(request.form.get('ib_min', 0) or 0)))
+        ib_max = max(0, min(10, int(request.form.get('ib_max', 0) or 0)))
+        ib_class_size = max(15, min(25, int(request.form.get('ib_class_size', 22) or 22)))
+        config_source = request.form.get('config_source', 'manual')
+
+        db = get_db()
+        db.execute('''
+            INSERT INTO school_config
+                (id, ki_enabled, gender_balance, parent_wishes, religion_distribute,
+                 religion_group, religion_bundle, ib_min, ib_max, ib_class_size,
+                 config_source, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                ki_enabled=excluded.ki_enabled,
+                gender_balance=excluded.gender_balance,
+                parent_wishes=excluded.parent_wishes,
+                religion_distribute=excluded.religion_distribute,
+                religion_group=excluded.religion_group,
+                religion_bundle=excluded.religion_bundle,
+                ib_min=excluded.ib_min,
+                ib_max=excluded.ib_max,
+                ib_class_size=excluded.ib_class_size,
+                config_source=excluded.config_source,
+                updated_at=excluded.updated_at
+        ''', (ki_enabled, gender_balance, parent_wishes, religion_distribute,
+              religion_group, religion_bundle, ib_min, ib_max, ib_class_size, config_source))
+        db.commit()
+        db.close()
+        flash('Konfiguration gespeichert.', 'success')
+        return redirect(url_for('school_config'))
+
+    config = get_school_config()
+    ki_available = bool(GEMINI_API_KEY or KI_PROXY_URL)
+    return render_template('school_config.html', config=config, ki_available=ki_available)
+
+
+@app.route('/school-config/ki-analyze', methods=['POST'])
+@admin_required
+def school_config_ki_analyze():
+    """AJAX: Schulbeschreibung an KI senden, Konfigurationsvorschlag zurückgeben."""
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'error': 'Kein Text angegeben.'}), 400
+    if len(text) > 2000:
+        return jsonify({'error': 'Text zu lang (max. 2000 Zeichen).'}), 400
+    try:
+        result = _ki_analyze_text(text)
+        # Normalisierung: bool → int, Grenzen prüfen
+        def b(val, default=False):
+            return 1 if val else 0
+        def i(val, lo, hi, default=0):
+            try:
+                return max(lo, min(hi, int(val)))
+            except (TypeError, ValueError):
+                return default
+        config = {
+            'gender_balance':      b(result.get('gender_balance', True)),
+            'parent_wishes':       b(result.get('parent_wishes', True)),
+            'religion_distribute': b(result.get('religion_distribute', True)),
+            'religion_group':      b(result.get('religion_group', False)),
+            'religion_bundle':     b(result.get('religion_bundle', False)),
+            'ib_min':              i(result.get('ib_min', 0), 0, 5, 0),
+            'ib_max':              i(result.get('ib_max', 0), 0, 10, 0),
+            'ib_class_size':       i(result.get('ib_class_size', 22), 15, 25, 22),
+        }
+        return jsonify({'config': config})
+    except RuntimeError as exc:
+        return jsonify({'error': str(exc)}), 503
+
+
+@app.route('/api/ki-config', methods=['POST'])
+@csrf.exempt
+def api_ki_config():
+    """Proxy-Endpunkt: Wird vom Stick aufgerufen, ruft Gemini direkt auf.
+    Geschützt durch KI_PROXY_TOKEN."""
+    if not KI_PROXY_TOKEN:
+        return jsonify({'error': 'Proxy nicht konfiguriert.'}), 503
+    token = request.headers.get('X-KI-Token', '')
+    if not token or token != KI_PROXY_TOKEN:
+        return jsonify({'error': 'Ungültiges Token.'}), 403
+    if not GEMINI_API_KEY:
+        return jsonify({'error': 'Kein GEMINI_API_KEY konfiguriert.'}), 503
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'error': 'Kein Text.'}), 400
+    if len(text) > 2000:
+        return jsonify({'error': 'Text zu lang.'}), 400
+
+    try:
+        # Direkt Gemini aufrufen (kein erneuter Proxy-Loop)
+        import requests as _req, json as _json, re as _re
+        url = (
+            'https://generativelanguage.googleapis.com/v1beta/models/'
+            f'gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}'
+        )
+        prompt = (
+            "Du bist ein Schulverwaltungs-Assistent. Analysiere die folgende Schulbeschreibung "
+            "und erstelle eine JSON-Konfiguration fuer einen Klasseneinteilungs-Algorithmus.\n\n"
+            f"Schulbeschreibung: {text}\n\n"
+            "Antworte NUR mit einem JSON-Objekt mit diesen Feldern:\n"
+            "- gender_balance (true/false)\n- parent_wishes (true/false)\n"
+            "- religion_distribute (true/false)\n- religion_group (true/false)\n"
+            "- religion_bundle (true/false)\n- ib_min (0-5)\n- ib_max (0-10)\n"
+            "- ib_class_size (15-25)\n\nNur JSON, keine Erklaerungen."
+        )
+        payload = {
+            'contents': [{'parts': [{'text': prompt}]}],
+            'generationConfig': {'temperature': 0.1},
+        }
+        resp = _req.post(url, json=payload, timeout=30)
+        resp.raise_for_status()
+        raw = resp.json()['candidates'][0]['content']['parts'][0]['text']
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        result = _json.loads(match.group() if match else raw)
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({'error': f'Gemini-Fehler: {exc}'}), 503
+
 
 # Error Handlers
 @app.errorhandler(404)

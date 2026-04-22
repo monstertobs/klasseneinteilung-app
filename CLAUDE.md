@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **security-hardened**, DSGVO-compliant Flask web application for generating school class divisions (5th grade). Considers parent wishes, gender balance, school routes (wohnort), school type (schulform), religion, special needs, and athletic ability. Designed for deployment on All-Inkl shared hosting with local SQLite storage.
 
-**Current version:** 0.1.36 (20. April 2026)
+**Current version:** 0.1.37 (22. April 2026)
 
 **Production:** Hetzner VPS, app path `/opt/klasseneinteilung/`, systemd service `klasseneinteilung`. Deploy via paramiko (password auth); `sshpass` not available on macOS.
 

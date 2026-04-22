@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Schul-Konfiguration — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Schul-Konfiguration</h2>
+    <p>Passen Sie den Algorithmus an die Anforderungen Ihrer Schule an</p>
+</div>
+
+<form method="POST" action="{{ url_for('school_config') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="config_source" id="config_source" value="{{ config.config_source }}">
+
+    <!-- KI-Assistent -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
+            <div>
+                <h3 style="margin:0; font-size:1.1rem;">KI-Assistent</h3>
+                <p style="margin:0.25rem 0 0 0; color:#666; font-size:0.875rem;">
+                    Beschreiben Sie Ihre Anforderungen – die KI schlägt passende Einstellungen vor
+                </p>
+            </div>
+            <label class="toggle-label" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <span style="font-size:0.875rem; color:#555;">KI aktivieren</span>
+                <div class="toggle-switch">
+                    <input type="checkbox" name="ki_enabled" id="ki_enabled" value="1"
+                           {% if config.ki_enabled %}checked{% endif %}
+                           onchange="toggleKiSection()">
+                    <span class="toggle-slider"></span>
+                </div>
+            </label>
+        </div>
+
+        <div id="ki-section" style="{% if not config.ki_enabled %}display:none;{% endif %} padding: 1.25rem 1.5rem; border-top: 1px solid #f0f0f0;">
+            {% if not ki_available %}
+            <div class="alert alert-warning" style="margin-bottom:1rem;">
+                <strong>Nicht konfiguriert:</strong> Für den KI-Assistenten muss auf dem Server
+                <code>GEMINI_API_KEY</code> oder <code>KI_PROXY_URL</code> in der <code>.env</code>-Datei gesetzt sein.
+            </div>
+            {% else %}
+            <div class="alert alert-info" style="margin-bottom:1rem; font-size:0.875rem;">
+                <strong>Datenschutz:</strong> Es werden ausschließlich Ihre Regelbeschreibung übermittelt —
+                keine Schüler- oder Personendaten.
+            </div>
+            {% endif %}
+
+            <div style="margin-bottom:1rem;">
+                <label class="form-label" for="ki_text">Beschreiben Sie Ihre Schule und Anforderungen:</label>
+                <textarea id="ki_text" rows="5" class="form-control"
+                    placeholder="Beispiel: Bei uns hat Geschlechterbalance höchste Priorität. Elternwünsche werden berücksichtigt, aber nicht erzwungen. Wir haben keine IB-Klassen. Religion spielt keine Rolle bei der Einteilung."
+                    style="resize:vertical; font-size:0.9rem;"
+                    maxlength="2000"></textarea>
+                <div style="text-align:right; font-size:0.75rem; color:#999; margin-top:0.25rem;">
+                    <span id="ki_char_count">0</span> / 2000 Zeichen
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="ki_analyze_btn"
+                    onclick="analyzeWithKI()" {% if not ki_available %}disabled{% endif %}>
+                KI analysieren
+            </button>
+
+            <!-- KI-Ergebnis Vorschau -->
+            <div id="ki_result" style="display:none; margin-top:1.25rem; padding:1rem; background:#f8f9fa; border-radius:10px; border:1px solid #e0e0e0;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+                    <strong style="color:#1d1d1f;">KI-Vorschlag</strong>
+                    <button type="button" class="btn btn-success btn-sm" onclick="applyKiResult()">
+                        Vorschlag übernehmen
+                    </button>
+                </div>
+                <div id="ki_result_text" style="font-size:0.875rem; color:#444;"></div>
+            </div>
+
+            <div id="ki_error" style="display:none; margin-top:0.75rem;" class="alert alert-danger"></div>
+        </div>
+    </div>
+
+    <!-- Manuelle Konfiguration -->
+    <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card-header">
+            <h3 style="margin:0; font-size:1.1rem;">Algorithmus-Einstellungen</h3>
+            <p style="margin:0.25rem 0 0 0; color:#666; font-size:0.875rem;">
+                Diese Werte werden beim Generieren als Standard-Vorgabe verwendet
+                {% if config.config_source == 'ki' %}
+                <span class="badge badge-info" style="margin-left:0.5rem;">KI-Vorschlag aktiv</span>
+                {% endif %}
+            </p>
+        </div>
+        <div style="padding:1.25rem 1.5rem;">
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+
+                <label class="config-row" style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; background:#fafafa; border-radius:8px; cursor:pointer;">
+                    <input type="checkbox" name="gender_balance" id="gender_balance" value="1"
+                           {% if config.gender_balance %}checked{% endif %}>
+                    <div>
+                        <div style="font-weight:500;">Geschlechterbalance</div>
+                        <div style="font-size:0.8rem; color:#666;">Gleichmäßige Verteilung von Mädchen und Jungen</div>
+                    </div>
+                </label>
+
+                <label class="config-row" style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; background:#fafafa; border-radius:8px; cursor:pointer;">
+                    <input type="checkbox" name="parent_wishes" id="parent_wishes" value="1"
+                           {% if config.parent_wishes %}checked{% endif %}>
+                    <div>
+                        <div style="font-weight:500;">Elternwünsche</div>
+                        <div style="font-size:0.8rem; color:#666;">Zusammen- und Trennwünsche berücksichtigen</div>
+                    </div>
+                </label>
+
+                <label class="config-row" style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; background:#fafafa; border-radius:8px; cursor:pointer;">
+                    <input type="checkbox" name="religion_distribute" id="religion_distribute" value="1"
+                           {% if config.religion_distribute %}checked{% endif %}
+                           onchange="syncReligion('distribute')">
+                    <div>
+                        <div style="font-weight:500;">Religion verteilen</div>
+                        <div style="font-size:0.8rem; color:#666;">Konfessionen gleichmäßig auf alle Klassen</div>
+                    </div>
+                </label>
+
+                <label class="config-row" style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; background:#fafafa; border-radius:8px; cursor:pointer;">
+                    <input type="checkbox" name="religion_group" id="religion_group" value="1"
+                           {% if config.religion_group %}checked{% endif %}
+                           onchange="syncReligion('group')">
+                    <div>
+                        <div style="font-weight:500;">Religion gruppieren</div>
+                        <div style="font-size:0.8rem; color:#666;">Gleichreligiöse Schüler zusammenhalten</div>
+                    </div>
+                </label>
+
+                <label class="config-row" style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem; background:#fafafa; border-radius:8px; cursor:pointer;">
+                    <input type="checkbox" name="religion_bundle" id="religion_bundle" value="1"
+                           {% if config.religion_bundle %}checked{% endif %}
+                           onchange="syncReligion('bundle')">
+                    <div>
+                        <div style="font-weight:500;">Religion bündeln</div>
+                        <div style="font-size:0.8rem; color:#666;">Konfessionen in einzelne Klassen konzentrieren</div>
+                    </div>
+                </label>
+
+            </div>
+
+            <!-- IB-Einstellungen -->
+            <div style="margin-top:1.25rem; padding:1rem; background:#fafafa; border-radius:8px;">
+                <div style="font-weight:500; margin-bottom:0.75rem;">IB-Schüler</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem;">
+                    <div>
+                        <label class="form-label" for="ib_min" style="font-size:0.875rem;">Minimum pro Klasse</label>
+                        <input type="number" name="ib_min" id="ib_min" class="form-control"
+                               value="{{ config.ib_min }}" min="0" max="5">
+                        <div style="font-size:0.75rem; color:#888; margin-top:0.25rem;">0 = keine IB-Schüler</div>
+                    </div>
+                    <div>
+                        <label class="form-label" for="ib_max" style="font-size:0.875rem;">Maximum pro Klasse</label>
+                        <input type="number" name="ib_max" id="ib_max" class="form-control"
+                               value="{{ config.ib_max }}" min="0" max="10">
+                        <div style="font-size:0.75rem; color:#888; margin-top:0.25rem;">0 = keine Beschränkung</div>
+                    </div>
+                    <div>
+                        <label class="form-label" for="ib_class_size" style="font-size:0.875rem;">Klassengröße IB</label>
+                        <input type="number" name="ib_class_size" id="ib_class_size" class="form-control"
+                               value="{{ config.ib_class_size }}" min="15" max="25">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+        <button type="submit" class="btn btn-primary">Konfiguration speichern</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Abbrechen</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleKiSection() {
+    const enabled = document.getElementById('ki_enabled').checked;
+    document.getElementById('ki-section').style.display = enabled ? '' : 'none';
+}
+
+function syncReligion(selected) {
+    // Nur eine Religion-Option aktiv
+    ['distribute', 'group', 'bundle'].forEach(opt => {
+        if (opt !== selected) document.getElementById('religion_' + opt).checked = false;
+    });
+}
+
+// Zeichenzähler
+const kiText = document.getElementById('ki_text');
+if (kiText) {
+    kiText.addEventListener('input', function() {
+        document.getElementById('ki_char_count').textContent = this.value.length;
+    });
+}
+
+let kiResultData = null;
+
+async function analyzeWithKI() {
+    const text = document.getElementById('ki_text').value.trim();
+    if (!text) {
+        alert('Bitte geben Sie eine Beschreibung ein.');
+        return;
+    }
+    const btn = document.getElementById('ki_analyze_btn');
+    const resultDiv = document.getElementById('ki_result');
+    const errorDiv = document.getElementById('ki_error');
+
+    btn.disabled = true;
+    btn.textContent = 'Analysiere…';
+    resultDiv.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    try {
+        const resp = await fetch('{{ url_for("school_config_ki_analyze") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value,
+            },
+            body: JSON.stringify({ text }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) {
+            throw new Error(data.error || 'Unbekannter Fehler');
+        }
+        kiResultData = data.config;
+        showKiResult(data.config);
+    } catch (err) {
+        errorDiv.textContent = 'Fehler: ' + err.message;
+        errorDiv.style.display = '';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'KI analysieren';
+    }
+}
+
+function showKiResult(cfg) {
+    const labels = {
+        gender_balance:      'Geschlechterbalance',
+        parent_wishes:       'Elternwünsche',
+        religion_distribute: 'Religion verteilen',
+        religion_group:      'Religion gruppieren',
+        religion_bundle:     'Religion bündeln',
+        ib_min:              'IB Minimum',
+        ib_max:              'IB Maximum',
+        ib_class_size:       'IB Klassengröße',
+    };
+    const lines = Object.entries(cfg).map(([k, v]) => {
+        const label = labels[k] || k;
+        const display = typeof v === 'number' && v <= 1
+            ? (v ? '<span style="color:#22c55e;">✓ Ja</span>' : '<span style="color:#ef4444;">✗ Nein</span>')
+            : `<strong>${v}</strong>`;
+        return `<div style="display:flex;justify-content:space-between;padding:0.2rem 0;">`
+             + `<span>${label}</span>${display}</div>`;
+    }).join('');
+    document.getElementById('ki_result_text').innerHTML = lines;
+    document.getElementById('ki_result').style.display = '';
+}
+
+function applyKiResult() {
+    if (!kiResultData) return;
+    const cfg = kiResultData;
+    const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+    setCheck('gender_balance',      cfg.gender_balance);
+    setCheck('parent_wishes',       cfg.parent_wishes);
+    setCheck('religion_distribute', cfg.religion_distribute);
+    setCheck('religion_group',      cfg.religion_group);
+    setCheck('religion_bundle',     cfg.religion_bundle);
+    const setNum = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+    setNum('ib_min',        cfg.ib_min);
+    setNum('ib_max',        cfg.ib_max);
+    setNum('ib_class_size', cfg.ib_class_size);
+    document.getElementById('config_source').value = 'ki';
+    document.getElementById('ki_result').style.display = 'none';
+    // Kurzes visuelles Feedback
+    const feedback = document.createElement('div');
+    feedback.className = 'alert alert-success';
+    feedback.textContent = 'KI-Vorschlag in die Einstellungen übernommen – bitte speichern.';
+    feedback.style.marginTop = '0.75rem';
+    document.getElementById('ki_result').parentNode.insertBefore(feedback, document.getElementById('ki_result'));
+    setTimeout(() => feedback.remove(), 4000);
+}
+</script>
+{% endblock %}
