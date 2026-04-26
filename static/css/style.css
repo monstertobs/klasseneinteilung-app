@@ -528,7 +528,141 @@ textarea.form-control {
     font-size: 0.95rem;
 }
 
-/* ---- Login ---- */
+/* ---- Login Split Layout ---- */
+.login-split {
+    display: flex;
+    min-height: calc(100vh - 4rem);
+    margin: -1.5rem -1.5rem 0;
+}
+
+/* Teaser-Seite (links) */
+.login-teaser {
+    flex: 1 1 55%;
+    background: linear-gradient(145deg, #1a1f6e 0%, #2d3ac7 45%, #4f6ef7 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2.5rem;
+}
+
+.login-teaser-inner {
+    max-width: 480px;
+    width: 100%;
+    color: #fff;
+}
+
+.login-teaser-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 2.25rem;
+}
+
+.login-teaser-icon {
+    font-size: 1.75rem;
+    line-height: 1;
+}
+
+.login-teaser-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #fff;
+}
+
+.login-teaser-headline {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+    margin: 0 0 1rem 0;
+    color: #fff;
+}
+
+.login-teaser-sub {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.78);
+    margin: 0 0 2rem 0;
+}
+
+.login-feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 2rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.login-feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.lf-icon {
+    font-size: 1rem;
+    line-height: 1.5;
+    flex-shrink: 0;
+}
+
+.login-feature-list li div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.login-feature-list li strong {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.login-feature-list li span {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.68);
+    line-height: 1.4;
+}
+
+.login-stats {
+    display: flex;
+    gap: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255,255,255,0.18);
+}
+
+.login-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.login-stat strong {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+}
+
+.login-stat span {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Form-Seite (rechts) */
+.login-form-side {
+    flex: 0 0 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 2rem;
+    background: var(--color-bg);
+}
+
+/* Login-Box (wiederverwendet für register.html) */
 .login-container {
     display: flex;
     justify-content: center;
@@ -544,6 +678,34 @@ textarea.form-control {
     border: 1px solid var(--color-border);
     max-width: 420px;
     width: 100%;
+}
+
+/* Mobile: einspaltig, Teaser oben */
+@media (max-width: 768px) {
+    .login-split {
+        flex-direction: column;
+        margin: -1.5rem -1rem 0;
+        min-height: unset;
+    }
+    .login-teaser {
+        padding: 2rem 1.5rem;
+        flex: none;
+    }
+    .login-teaser-headline {
+        font-size: 1.35rem;
+    }
+    .login-stats {
+        gap: 1.25rem;
+    }
+    .login-form-side {
+        flex: none;
+        padding: 2rem 1rem;
+    }
+    .login-box {
+        padding: 2rem 1.5rem;
+        box-shadow: none;
+        border: none;
+    }
 }
 
 .login-header {

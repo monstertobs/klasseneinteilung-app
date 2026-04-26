@@ -1,41 +1,117 @@
 {% extends "base.html" %}
 
-{% block title %}Anmelden — Klasseneinteilung{% endblock %}
+{% block title %}Anmelden — Klassenwahl{% endblock %}
 
 {% block content %}
-<div class="login-container">
-    <div class="login-box">
-        <div class="login-header">
-            <h2>Klasseneinteilung</h2>
-            <p>Bitte melden Sie sich an</p>
-        </div>
+<div class="login-split">
 
-        <form method="POST" action="{{ url_for('login') }}" class="login-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-                <label for="username">Benutzername</label>
-                <input type="text" id="username" name="username" class="form-control" required autofocus>
+    <!-- ══ Linke Seite: Teaser ══════════════════════════════════════ -->
+    <div class="login-teaser">
+        <div class="login-teaser-inner">
+            <div class="login-teaser-brand">
+                <span class="login-teaser-icon">&#127979;</span>
+                <span class="login-teaser-name">Klassenwahl</span>
             </div>
 
-            <div class="form-group">
-                <label for="password">Passwort</label>
-                <input type="password" id="password" name="password" class="form-control" required>
+            <h1 class="login-teaser-headline">
+                Intelligente Klasseneinteilung&nbsp;–<br>fair, transparent und schnell.
+            </h1>
+            <p class="login-teaser-sub">
+                Automatisierte Einteilung f&uuml;r 5.&nbsp;Klassen mit Ber&uuml;cksichtigung
+                aller relevanten Kriterien. In Sekunden statt Stunden.
+            </p>
+
+            <ul class="login-feature-list">
+                <li>
+                    <span class="lf-icon">&#9989;</span>
+                    <div>
+                        <strong>Elternw&uuml;nsche</strong>
+                        <span>Zusammen- und Trennungsw&uuml;nsche werden gewichtet ber&uuml;cksichtigt</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="lf-icon">&#9989;</span>
+                    <div>
+                        <strong>Ausgeglichene Klassen</strong>
+                        <span>Geschlecht, Schulform, Wohnort und Religion gleichm&auml;&szlig;ig verteilt</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="lf-icon">&#9989;</span>
+                    <div>
+                        <strong>Spezialklassen</strong>
+                        <span>IB, Sport, Musik und Theater mit konfigurierbaren Min/Max-Grenzen</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="lf-icon">&#9989;</span>
+                    <div>
+                        <strong>3 Vorschl&auml;ge &amp; Vergleich</strong>
+                        <span>Verschiedene Varianten generieren, vergleichen und per Drag&nbsp;&amp;&nbsp;Drop anpassen</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="lf-icon">&#9989;</span>
+                    <div>
+                        <strong>DSGVO-konform</strong>
+                        <span>Jeder Nutzer hat eine eigene, isolierte Datenbank</span>
+                    </div>
+                </li>
+            </ul>
+
+            <div class="login-stats">
+                <div class="login-stat">
+                    <strong>300+</strong>
+                    <span>Sch&uuml;ler</span>
+                </div>
+                <div class="login-stat">
+                    <strong>10+</strong>
+                    <span>Kriterien</span>
+                </div>
+                <div class="login-stat">
+                    <strong>3</strong>
+                    <span>Vorschl&auml;ge</span>
+                </div>
             </div>
-
-            <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
-        </form>
-
-        {% if initial_password %}
-        <div class="login-info">
-            <p><strong>Erstanmeldung:</strong></p>
-            <p>Benutzer: <code>admin</code> &middot; Passwort: <code>{{ initial_password }}</code></p>
-            <p class="text-small">Bitte &auml;ndern Sie das Passwort nach der ersten Anmeldung.</p>
-        </div>
-        {% endif %}
-
-        <div style="text-align:center; margin-top:1.25rem; color:#86868b; font-size:0.9rem;">
-            Noch kein Konto? <a href="{{ url_for('register') }}">Jetzt registrieren</a>
         </div>
     </div>
+
+    <!-- ══ Rechte Seite: Login-Formular ════════════════════════════ -->
+    <div class="login-form-side">
+        <div class="login-box">
+            <div class="login-header">
+                <h2>Willkommen zur&uuml;ck</h2>
+                <p>Bitte melden Sie sich an</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('login') }}" class="login-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="username">Benutzername</label>
+                    <input type="text" id="username" name="username" class="form-control" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Passwort</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Anmelden</button>
+            </form>
+
+            {% if initial_password %}
+            <div class="login-info">
+                <p><strong>Erstanmeldung:</strong></p>
+                <p>Benutzer: <code>admin</code> &middot; Passwort: <code>{{ initial_password }}</code></p>
+                <p class="text-small">Bitte &auml;ndern Sie das Passwort nach der ersten Anmeldung.</p>
+            </div>
+            {% endif %}
+
+            <div style="text-align:center; margin-top:1.25rem; color:#86868b; font-size:0.9rem;">
+                Noch kein Konto? <a href="{{ url_for('register') }}">Jetzt registrieren</a>
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
