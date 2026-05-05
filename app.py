@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.38
+Version: 0.1.39
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 20. April 2026
+Date: 5. Mai 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.38'
+__version__ = '0.1.39'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1956,21 +1956,39 @@ def extract_plz_from_wohnort(wohnort):
         return match.group(1)
     return None
 
-def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, pinned_student_ids=None):
+def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, pinned_student_ids=None, specialized_mapping=None):
     """
     Post-Processing: Verbessert Wunsch-Erfüllungsrate durch iterativen Schüler-Tausch.
     - Tauscht bevorzugt gleichgeschlechtliche Schüler (Geschlechterbalance bleibt erhalten)
     - Verschiebt Schüler wenn Zielklasse noch Platz hat
     - Wiederholt bis keine Verbesserung mehr möglich (max. max_rounds Durchläufe)
     - Gepinnte Schüler (aus Basis-Einteilung) werden nicht bewegt
+    - Sport-Schüler bleiben in Sportklassen; Nicht-Sport-Schüler kommen nicht in Sportklassen
     """
     num_classes = len(classes)
     if options is None:
         options = {}
     if pinned_student_ids is None:
         pinned_student_ids = set()
+    if specialized_mapping is None:
+        specialized_mapping = {}
     ib_min = options.get('ib_min', 0)
     ib_max = options.get('ib_max', 0)
+
+    sport_class_indices = {ci for ci, t in specialized_mapping.items() if t == 'sport'}
+
+    def sport_move_allowed(student, from_idx, to_idx):
+        if not sport_class_indices:
+            return True
+        if student.get('sport_interesse'):
+            # Sport-Schüler nicht aus Sportklasse herausbewegen
+            if from_idx in sport_class_indices and to_idx not in sport_class_indices:
+                return False
+        else:
+            # Nicht-Sport-Schüler nicht in Sportklasse hineinschieben
+            if to_idx in sport_class_indices:
+                return False
+        return True
 
     def ib_count_for(cls):
         return sum(1 for s in cls if s.get('schulform') == 'IB')
@@ -2042,7 +2060,9 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
                 gender = s_obj.get('gender', '')
 
                 # Option 1: Verschiebe sid nach class_b wenn Platz vorhanden
-                if len(classes[class_b]) < MAX_CLASS_SIZE and ib_move_allowed(s_obj, classes[class_a], classes[class_b]):
+                if (len(classes[class_b]) < MAX_CLASS_SIZE
+                        and ib_move_allowed(s_obj, classes[class_a], classes[class_b])
+                        and sport_move_allowed(s_obj, class_a, class_b)):
                     student_to_class[sid] = class_b
                     new_score = total_wish_score()
                     if new_score > current_score:
@@ -2065,6 +2085,10 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
                     if not ib_move_allowed(s_obj, classes[class_a], classes[class_b]):
                         continue
                     if not ib_move_allowed(candidate, classes[class_b], classes[class_a]):
+                        continue
+                    if not sport_move_allowed(s_obj, class_a, class_b):
+                        continue
+                    if not sport_move_allowed(candidate, class_b, class_a):
                         continue
                     cid = candidate['id']
                     # In-place tauschen und testen
@@ -2115,6 +2139,8 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
                         if len(classes[target]) >= MAX_CLASS_SIZE:
                             continue
                         if not ib_move_allowed(s_obj, classes[class_a], classes[target]):
+                            continue
+                        if not sport_move_allowed(s_obj, class_a, target):
                             continue
                         student_to_class[sid] = target
                         new_score = total_wish_score()
@@ -2248,9 +2274,21 @@ def generate_class_assignment(students, wishes, num_classes, seed, options, base
         student_list = remaining
 
     # Wünsche als Dictionary organisieren
+    # Sportklasse hat Priorität: Wünsche zwischen Sport- und Nicht-Sport-Schülern ignorieren,
+    # da diese sowieso in verschiedene Klassen kommen.
+    sport_student_ids = set()
+    if sport_count > 0:
+        sport_student_ids = {s['id'] for s in students if s.get('sport_interesse')}
+
     wish_dict = {}
     for wish in wishes:
         student_id = wish['student_id']
+        related_id = wish.get('related_student_id')
+        if sport_student_ids and related_id:
+            s_is_sport = student_id in sport_student_ids
+            r_is_sport = related_id in sport_student_ids
+            if s_is_sport != r_is_sport:
+                continue  # Wunsch ignorieren: einer in Sportklasse, der andere nicht
         if student_id not in wish_dict:
             wish_dict[student_id] = []
         wish_dict[student_id].append(wish)
@@ -2394,7 +2432,7 @@ def generate_class_assignment(students, wishes, num_classes, seed, options, base
             ib_count[best_class] += 1
 
     # Post-Processing: Wunsch-Erfüllungsrate durch iterativen Tausch verbessern
-    optimize_assignment_wishes(classes, wish_dict, options=options, pinned_student_ids=pinned_student_ids)
+    optimize_assignment_wishes(classes, wish_dict, options=options, pinned_student_ids=pinned_student_ids, specialized_mapping=specialized_mapping)
 
     # Statistiken nach Optimierung neu berechnen (Klassen-Zusammensetzung hat sich geändert)
     gender_count = [{'m': 0, 'w': 0} for _ in range(num_classes)]
