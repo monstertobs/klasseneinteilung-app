@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.39
+Version: 0.1.40
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 5. Mai 2026
+Date: 6. Mai 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.39'
+__version__ = '0.1.40'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2278,12 +2278,12 @@ def generate_class_assignment(students, wishes, num_classes, seed, options, base
     # da diese sowieso in verschiedene Klassen kommen.
     sport_student_ids = set()
     if sport_count > 0:
-        sport_student_ids = {s['id'] for s in students if s.get('sport_interesse')}
+        sport_student_ids = {s['id'] for s in students if s['sport_interesse']}
 
     wish_dict = {}
     for wish in wishes:
         student_id = wish['student_id']
-        related_id = wish.get('related_student_id')
+        related_id = wish['related_student_id']
         if sport_student_ids and related_id:
             s_is_sport = student_id in sport_student_ids
             r_is_sport = related_id in sport_student_ids
