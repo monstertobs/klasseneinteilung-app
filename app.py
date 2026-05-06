@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.43
+Version: 0.1.44
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 6. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.43'
+__version__ = '0.1.44'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1019,8 +1019,8 @@ def process_import_data(data, batch_id):
 
     # Spezielle Spalten für Freundewünsche und IB/VM
     special_columns = {
-        'freund_freundin': ['freund/ freundin', 'freund / freundin', 'freund', 'freundin'],
-        'auf_keinen_fall': ['auf keine fall mit kind…', 'auf keinen fall mit kind', 'auf keinen fall', 'nicht mit'],
+        'freund_freundin': ['freund/ freundin', 'freund / freundin', 'freund/freundin', 'freund', 'freundin'],
+        'auf_keinen_fall': ['auf keine fall mit kind…', 'auf keinen fall mit kind', 'auf keinen fall mit', 'auf keinen fall', 'nicht mit'],
         'ib_vm': ['ib / vm - s.liste', 'ib / vm', 'ib vm', 'ib/vm']
     }
 
