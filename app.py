@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.42
+Version: 0.1.43
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 6. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.42'
+__version__ = '0.1.43'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1859,11 +1859,17 @@ def generate():
             'ib_class_size': sc.get('ib_class_size', 22),
         }
 
-    # Sportklassen: sicherstellen dass genug Nicht-Sport-Kapazität vorhanden ist
+    # Klassenanzahl anpassen: Sportklassen-Isolation + ib_class_size-Reduktion berücksichtigen
     sport_count_opt = options.get('specialized_classes', {}).get('sport', 0)
+    ib_cs = options.get('ib_class_size', 0)
+    eff_max = ib_cs if ib_cs > 0 else MAX_CLASS_SIZE
+    # Gesamtkapazität sicherstellen (ib_class_size reduziert effektive Kapazität pro Klasse)
+    total_classes_needed = max(1, (len(students) + eff_max - 1) // eff_max)
+    num_classes = max(num_classes, total_classes_needed)
+    # Nicht-Sport-Kapazität sicherstellen
     if sport_count_opt > 0:
         non_sport_student_count = sum(1 for s in students if not s['sport_interesse'])
-        non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
+        non_sport_classes_min = max(1, (non_sport_student_count + eff_max - 1) // eff_max)
         num_classes = max(num_classes, sport_count_opt + non_sport_classes_min)
 
     # Basis-Einteilung laden (falls angegeben)
@@ -2561,14 +2567,14 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
             # Nur für Sport-Klassen (Custom hat kein Interesse-Feld)
             if special_type == 'sport':
                 if student.get('sport_interesse'):
-                    score += 50  # Starker Bonus: Sportklassen-Hacken
+                    score += 500  # Sehr starker Bonus: Sport-Schüler gehören in Sportklasse
                 else:
                     score -= 5000  # Harte Sperre: kein Sportklassen-Hacken → nie in Sportklasse
 
         # Wenn Schüler Sport-Interesse hat aber nicht in Sport-Spezialklasse
         if student.get('sport_interesse'):
             if specialized_mapping.get(i) != 'sport':
-                score -= 10  # Leichte Strafe
+                score -= 200  # Starke Strafe: Sport-Schüler sollen nicht in Normal-Klassen
 
         # Sportklasse (backward compatibility): Klasse 1 (Index 0) für sportliche Schüler
         if options.get('sportklasse', False):
@@ -2690,6 +2696,14 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                     score -= 500   # Wunschsteller ist bereits in dieser Klasse → Strafe
 
         scores.append(score)
+
+    # Absolute Sperre: Nicht-Sport-Schüler dürfen NIEMALS in Sportklasse
+    # (gilt auch wenn Sportklasse durch "voll"-Check schon -10000 hat und die Strafe in der
+    #  Hauptschleife durch `continue` übersprungen wurde)
+    if not student.get('sport_interesse') and specialized_mapping:
+        for sci, st in specialized_mapping.items():
+            if st == 'sport' and sci < len(scores):
+                scores[sci] -= 100000
 
     # Klasse mit höchstem Score auswählen
     best_class = scores.index(max(scores))
