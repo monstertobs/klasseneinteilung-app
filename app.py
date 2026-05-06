@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.41
+Version: 0.1.42
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 6. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.41'
+__version__ = '0.1.42'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1859,6 +1859,13 @@ def generate():
             'ib_class_size': sc.get('ib_class_size', 22),
         }
 
+    # Sportklassen: sicherstellen dass genug Nicht-Sport-Kapazität vorhanden ist
+    sport_count_opt = options.get('specialized_classes', {}).get('sport', 0)
+    if sport_count_opt > 0:
+        non_sport_student_count = sum(1 for s in students if not s['sport_interesse'])
+        non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
+        num_classes = max(num_classes, sport_count_opt + non_sport_classes_min)
+
     # Basis-Einteilung laden (falls angegeben)
     base_assignment = None
     base_assignment_id = request.form.get('base_assignment_id', '') if request.method == 'POST' else ''
@@ -2343,7 +2350,7 @@ def generate_class_assignment(students, wishes, num_classes, seed, options, base
                 # IB ohne Sportklassen-Hacken nicht in Sportklassen einteilen
                 if not student.get('sport_interesse') and target_class in sport_class_indices:
                     for alt in range(num_ib_classes):
-                        if alt not in sport_class_indices and ib_count[alt] < ib_max:
+                        if alt not in sport_class_indices and (ib_max == 0 or ib_count[alt] < ib_max):
                             target_class = alt
                             break
                 # Falls Maximum erreicht, nächste Klasse mit Platz suchen
