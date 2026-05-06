@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.40
+Version: 0.1.41
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 6. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.40'
+__version__ = '0.1.41'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2555,10 +2555,8 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
             if special_type == 'sport':
                 if student.get('sport_interesse'):
                     score += 50  # Starker Bonus: Sportklassen-Hacken
-                elif is_ib_student:
-                    score -= 5000  # Harte Sperre: IB ohne Sportklassen-Hacken nie in Sportklasse
                 else:
-                    score -= 200  # Starke Strafe: kein Hacken → möglichst nicht in Sportklasse
+                    score -= 5000  # Harte Sperre: kein Sportklassen-Hacken → nie in Sportklasse
 
         # Wenn Schüler Sport-Interesse hat aber nicht in Sport-Spezialklasse
         if student.get('sport_interesse'):
