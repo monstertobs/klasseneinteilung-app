@@ -1,121 +1,130 @@
 {% extends "base.html" %}
-
 {% block title %}App-Update — Klasseneinteilung{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
         <h2>App-Update</h2>
-        <p>Installierte Version: <strong>{{ current_version }}</strong></p>
     </div>
 </div>
 
-{% if error %}
-<div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
-    <strong>⚠️ Fehler:</strong> {{ error }}
+{# ── Fortschritts-Overlay ─────────────────────────────────────── #}
+<div id="update-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; display:none; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:2.5rem 2rem; width:340px; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+        <div style="font-size:2rem; margin-bottom:1rem;">⬇️</div>
+        <div style="font-weight:600; font-size:1.05rem; margin-bottom:1.25rem;" id="overlay-status">Update wird heruntergeladen…</div>
+        <div style="background:#e9ecef; border-radius:8px; height:10px; overflow:hidden; margin-bottom:0.75rem;">
+            <div id="progress-bar" style="height:100%; width:0%; background:#007aff; border-radius:8px; transition:width 0.4s ease;"></div>
+        </div>
+        <div style="font-size:0.82rem; color:#888;">Bitte warten — die App startet automatisch neu.</div>
+    </div>
 </div>
-{% endif %}
 
-{# ── Versionsstatus ─────────────────────────────────────────── #}
-<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
-    <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <td style="padding: 0.5rem 0; color: #666; width: 180px;">Installierte Version</td>
-            <td><strong>{{ current_version }}</strong></td>
-        </tr>
-        <tr>
-            <td style="padding: 0.5rem 0; color: #666;">GitHub Version</td>
-            <td>
-                {% if github_version %}
-                    <strong>{{ github_version }}</strong>
-                    {% if update_available %}
-                        <span style="background: #28a745; color: #fff; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.82rem; margin-left: 0.5rem;">Neu verfügbar</span>
-                    {% else %}
-                        <span style="background: #6c757d; color: #fff; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.82rem; margin-left: 0.5rem;">Aktuell</span>
-                    {% endif %}
-                {% elif not error %}
-                    <span style="color: #999;">Wird geprüft…</span>
+{# ── Statusbox ────────────────────────────────────────────────── #}
+<div style="background:#f8f9fa; border:1px solid #dee2e6; border-radius:10px; padding:1.5rem; margin-bottom:1.5rem; max-width:480px;">
+
+    {% if error %}
+    <div style="color:#dc3545; margin-bottom:1rem; font-size:0.92rem;">⚠️ {{ error }}</div>
+    {% endif %}
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+        <span style="color:#666; font-size:0.9rem;">Installiert</span>
+        <strong>v{{ current_version }}</strong>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <span style="color:#666; font-size:0.9rem;">Verfügbar (GitHub)</span>
+        {% if github_version %}
+            <span>
+                <strong>v{{ github_version }}</strong>
+                {% if update_available %}
+                    <span style="background:#28a745; color:#fff; padding:0.15rem 0.5rem; border-radius:8px; font-size:0.78rem; margin-left:0.4rem;">Neu</span>
                 {% else %}
-                    <span style="color: #dc3545;">Nicht erreichbar</span>
+                    <span style="background:#6c757d; color:#fff; padding:0.15rem 0.5rem; border-radius:8px; font-size:0.78rem; margin-left:0.4rem;">Aktuell</span>
                 {% endif %}
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 0.5rem 0; color: #666;">Repository</td>
-            <td style="font-size: 0.9rem; color: #555;">github.com/monstertobs/klasseneinteilung-app</td>
-        </tr>
-    </table>
-
-    <div style="margin-top: 1rem;">
-        <a href="{{ url_for('check_update') }}" class="btn btn-secondary">🔄 Erneut prüfen</a>
-    </div>
-</div>
-
-{# ── Update verfügbar ───────────────────────────────────────── #}
-{% if update_available %}
-<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
-    <h4 style="margin-top: 0; color: #155724;">🎉 Update auf Version {{ github_version }} verfügbar</h4>
-
-    {% if new_sections %}
-    <div style="margin-bottom: 1.25rem;">
-        <strong>Was ist neu:</strong>
-        {% for section in new_sections %}
-        <div style="background: #fff; border: 1px solid #c3e6cb; border-radius: 6px; padding: 1rem; margin-top: 0.75rem; font-size: 0.9rem; white-space: pre-wrap; font-family: inherit;">{{ section }}</div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p style="color: #155724;">Keine detaillierten Änderungsnotizen verfügbar.</p>
-    {% endif %}
-
-    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem;">
-        ⚠️ <strong>Hinweis:</strong> Vor dem Update wird automatisch ein Backup angelegt.
-        Deine Datenbank und Konfiguration (<code>.env</code>) bleiben unberührt.
-        Nach dem Update muss die App neu gestartet werden.
+            </span>
+        {% else %}
+            <span style="color:#999; font-size:0.9rem;">— nicht erreichbar</span>
+        {% endif %}
     </div>
 
-    {% if session.is_admin %}
-    <form method="POST" action="{{ url_for('apply_update') }}" onsubmit="return confirm('Update auf Version {{ github_version }} installieren? Die App muss danach neu gestartet werden.')">
+    {% if update_available and session.is_admin %}
+    <form method="POST" action="{{ url_for('apply_update') }}" id="update-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-primary">⬇️ Update {{ github_version }} installieren</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;">
+            Update auf v{{ github_version }} installieren
+        </button>
     </form>
-    {% else %}
-    <p style="color: #555; font-size: 0.92rem;">Nur der Administrator kann Updates installieren.</p>
+    {% elif update_available %}
+    <p style="color:#555; font-size:0.9rem; margin:0;">Nur der Administrator kann Updates installieren.</p>
+    {% elif github_version and not error %}
+    <p style="color:#28a745; font-size:0.92rem; margin:0;">✓ Du hast die neueste Version.</p>
     {% endif %}
+
+    <div style="margin-top:1rem;">
+        <a href="{{ url_for('check_update') }}" style="font-size:0.85rem; color:#007aff;">↺ Erneut prüfen</a>
+    </div>
 </div>
 
-{% elif github_version and not error %}
-<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
-    ✅ <strong>Du hast die neueste Version.</strong> Kein Update erforderlich.
+{# ── Flash-Meldungen ──────────────────────────────────────────── #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for cat, msg in messages %}
+<div style="border-radius:8px; padding:0.9rem 1.1rem; margin-bottom:1rem; font-size:0.92rem;
+    {% if cat == 'success' %}background:#d4edda; border:1px solid #c3e6cb; color:#155724;
+    {% elif cat == 'danger' %}background:#f8d7da; border:1px solid #f5c6cb; color:#721c24;
+    {% else %}background:#fff3cd; border:1px solid #ffc107; color:#856404;{% endif %}">
+    {{ msg }}
 </div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+{# ── Rollback ─────────────────────────────────────────────────── #}
+{% if has_backup and session.is_admin %}
+<details style="margin-bottom:1.5rem;">
+    <summary style="cursor:pointer; font-size:0.88rem; color:#666;">Vorherige Version wiederherstellen (Rollback)</summary>
+    <div style="margin-top:0.75rem; padding:1rem; background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px;">
+        <p style="font-size:0.88rem; color:#555; margin:0 0 0.75rem 0;">Ein Backup der vorherigen Version ist vorhanden.</p>
+        <form method="POST" action="{{ url_for('rollback_update') }}" onsubmit="return confirm('Zur vorherigen Version zurückkehren?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary" style="font-size:0.88rem; border-color:#dc3545; color:#dc3545;">Rollback durchführen</button>
+        </form>
+    </div>
+</details>
 {% endif %}
 
-{# ── Rollback ───────────────────────────────────────────────── #}
-{% if has_backup %}
-<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
-    <h4 style="margin-top: 0;">↩️ Rollback</h4>
-    <p style="color: #555; font-size: 0.92rem; margin-bottom: 1rem;">
-        Ein Backup der vorherigen Version ist vorhanden. Falls nach einem Update Probleme auftreten,
-        kann die vorherige Version wiederhergestellt werden. Die App muss danach neu gestartet werden.
-    </p>
-    {% if session.is_admin %}
-    <form method="POST" action="{{ url_for('rollback_update') }}" onsubmit="return confirm('Zur vorherigen Version zurückkehren? Die App muss danach neu gestartet werden.')">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-secondary" style="border-color: #dc3545; color: #dc3545;">Rollback — Vorherige Version wiederherstellen</button>
-    </form>
-    {% else %}
-    <p style="color: #555; font-size: 0.92rem;">Nur der Administrator kann einen Rollback durchführen.</p>
-    {% endif %}
-</div>
-{% endif %}
+<a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück zum Dashboard</a>
 
-{# ── Hinweis manueller Neustart ─────────────────────────────── #}
-<div style="background: #e9ecef; border-radius: 8px; padding: 1rem 1.25rem; font-size: 0.88rem; color: #555;">
-    <strong>Nach einem Update oder Rollback:</strong>
-    Das Konsolenfenster schließen und die App über <code>PORTABLE-START.bat</code> (Windows)
-    bzw. <code>python app.py</code> neu starten.
-</div>
+<script>
+(function() {
+    var form = document.getElementById('update-form');
+    if (!form) return;
 
-<div style="margin-top: 1.5rem;">
-    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Zurück zum Dashboard</a>
-</div>
+    var overlay = document.getElementById('update-overlay');
+    var bar     = document.getElementById('progress-bar');
+    var status  = document.getElementById('overlay-status');
+
+    var steps = [
+        { pct: 15, label: 'Backup wird erstellt…',        delay: 400  },
+        { pct: 40, label: 'Update wird heruntergeladen…', delay: 1200 },
+        { pct: 75, label: 'Dateien werden installiert…',  delay: 2800 },
+        { pct: 90, label: 'App wird neu gestartet…',      delay: 4200 },
+    ];
+
+    form.addEventListener('submit', function() {
+        overlay.style.display = 'flex';
+        var i = 0;
+        function next() {
+            if (i >= steps.length) return;
+            var s = steps[i++];
+            setTimeout(function() {
+                bar.style.width = s.pct + '%';
+                status.textContent = s.label;
+                next();
+            }, s.delay);
+        }
+        next();
+    });
+})();
+</script>
 {% endblock %}

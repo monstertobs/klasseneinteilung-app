@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.49
+Version: 0.1.50
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 27. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.49'
+__version__ = '0.1.50'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2774,15 +2774,22 @@ def _parse_new_changelog(changelog_text, current_ver):
 @app.route('/admin/update')
 @login_required
 def check_update():
-    """Update-Seite: prüft ob eine neuere Version auf GitHub verfügbar ist."""
+    """Update-Seite: prüft ob eine neuere Version auf GitHub verfügbar ist (via Releases API)."""
+    import json as _json, urllib.request
     github_version = None
-    new_sections = []
     error = None
 
     try:
-        raw = _fetch_github_text(f'{GITHUB_RAW_BASE}/app.py')
-        m = re.search(r"__version__\s*=\s*'([^']+)'", raw)
-        if m and re.match(r'^\d+\.\d+\.\d+$', m.group(1)):
+        api_url = f'https://api.github.com/repos/{GITHUB_REPO}/releases/latest'
+        req = urllib.request.Request(api_url, headers={
+            'User-Agent': 'KlasseneinteilungApp-Updater/1.0',
+            'Accept': 'application/vnd.github.v3+json',
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode('utf-8'))
+        tag = data.get('tag_name', '')
+        m = re.match(r'^v?(\d+\.\d+\.\d+)$', tag)
+        if m:
             github_version = m.group(1)
         else:
             error = 'Konnte Version nicht aus GitHub lesen.'
@@ -2792,20 +2799,12 @@ def check_update():
     update_available = (github_version is not None and
                         _version_tuple(github_version) > _version_tuple(__version__))
 
-    if update_available:
-        try:
-            changelog_raw = _fetch_github_text(f'{GITHUB_RAW_BASE}/VERSION_HISTORY.md')
-            new_sections = _parse_new_changelog(changelog_raw, __version__)
-        except Exception:
-            new_sections = []
-
     has_backup = os.path.exists(_get_update_backup_dir())
 
     return render_template('update.html',
                            current_version=__version__,
                            github_version=github_version,
                            update_available=update_available,
-                           new_sections=new_sections,
                            error=error,
                            has_backup=has_backup)
 
