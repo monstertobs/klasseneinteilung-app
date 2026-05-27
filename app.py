@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.44
+Version: 0.1.45
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 6. Mai 2026
+Date: 27. Mai 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.44'
+__version__ = '0.1.45'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 

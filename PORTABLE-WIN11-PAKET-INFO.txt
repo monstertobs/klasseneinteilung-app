@@ -6,8 +6,8 @@
 📦 PAKET-DETAILS:
 ──────────────────────────────────────────────────────────────────────────
   Paket-Name:      klasseneinteilung-app-PORTABLE-WIN11.zip
-  Version:         0.1.44 - KI-Assistent Edition
-  Release Date:    6. Mai 2026
+  Version:         0.1.45 - KI-Assistent Edition
+  Release Date:    27. Mai 2026
   Paket-Typ:       Portable (kein Installer)
   Zielplattform:   Windows 11 (funktioniert auch auf Windows 10)
 
@@ -63,7 +63,7 @@
   Download-Volumen:         ca. 27 MB
 
 
-🔒 SICHERHEITS-FEATURES (v0.1.44):
+🔒 SICHERHEITS-FEATURES (v0.1.45):
 ──────────────────────────────────────────────────────────────────────────
   Authentifizierung:
     ✓ Zufällig generiertes 16-Zeichen Initial-Passwort
@@ -152,7 +152,7 @@
 ──────────────────────────────────────────────────────────────────────────
   Autor:    Tobias Meier
   Email:    admin(at)secutobs.com
-  Version:  0.1.44 - KI-Assistent Edition
+  Version:  0.1.45 - KI-Assistent Edition
 
 
 📄 LIZENZ:
