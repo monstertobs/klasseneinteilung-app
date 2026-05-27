@@ -82,6 +82,22 @@
         </div>
 
         <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-top: 0.75rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <strong>Anzahl Klassen:</strong>
+                {% set dropdown_max = [schulamt_max_classes + 3, 15] | min %}
+                <select name="num_classes" class="form-control" style="width: 6rem;">
+                    {% for i in range(1, dropdown_max + 1) %}
+                    <option value="{{ i }}" {% if options.get('num_classes', schulamt_max_classes) == i %}selected{% endif %}>{{ i }}</option>
+                    {% endfor %}
+                </select>
+                <span style="color: #6c757d; font-size: 0.875rem;">
+                    Schulamt-Vorgabe: <strong>{{ schulamt_max_classes }}</strong> Klassen
+                    ({{ proposals[0].statistics.total_students }} Sch&uuml;ler &divide; 25)
+                </span>
+            </label>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-top: 0.75rem;">
             <strong>Spezialklassen:</strong>
             <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
                 <label style="display: flex; align-items: center; gap: 0.5rem;">

@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.45
+Version: 0.1.46
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 27. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.45'
+__version__ = '0.1.46'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1790,13 +1790,9 @@ def generate():
         flash('Keine Schüler vorhanden. Bitte fügen Sie zuerst Schüler hinzu.', 'warning')
         return redirect(url_for('students'))
 
-    # Anzahl der Klassen berechnen (max. 25 Schüler pro Klasse)
-    num_classes = max(1, (len(students) + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
-
-    # Validierung: Warnung wenn Klassen sehr voll werden
-    avg_class_size = len(students) / num_classes
-    if avg_class_size > MAX_CLASS_SIZE - 2:  # Warnung ab 23+ Schüler pro Klasse
-        flash(f'ℹ️ {num_classes} Klassen erstellt für {len(students)} Schüler (Ø {avg_class_size:.1f} pro Klasse, max. {MAX_CLASS_SIZE})', 'info')
+    # Schulamt-Vorgabe: max. Klassenanzahl bei 25 Schüler/Klasse
+    schulamt_max_classes = max(1, (len(students) + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
+    num_classes = schulamt_max_classes
 
     # Optionen aus POST oder Standardwerte
     if request.method == 'POST':
@@ -1824,13 +1820,22 @@ def generate():
             specialized_classes['custom'] = 0
             specialized_classes['custom_name'] = ''
 
+        ib_class_size = int(request.form.get('ib_class_size', '22'))
+
+        # Klassenanzahl-Override aus Formular (früh lesen, damit Checks korrekt sind)
+        num_classes_form = int(request.form.get('num_classes', schulamt_max_classes))
+        num_classes_form = max(1, min(20, num_classes_form))
+        num_classes = num_classes_form
+
         # Pre-Generation Check: Genug IB-Schüler?
         if ib_max > 0:
             ib_students = [s for s in students if s['schulform'] == 'IB']
             if len(ib_students) > num_classes * ib_max:
                 flash(f'⚠️ Zu viele IB-Schüler ({len(ib_students)}) für {num_classes} Klassen mit max {ib_max} pro Klasse', 'warning')
 
-        ib_class_size = int(request.form.get('ib_class_size', '22'))
+        avg_class_size = len(students) / num_classes
+        if avg_class_size > MAX_CLASS_SIZE:
+            flash(f'⚠️ {num_classes} Klassen für {len(students)} Schüler ergibt Ø {avg_class_size:.1f} Schüler/Klasse (über dem Schulamt-Richtwert von {MAX_CLASS_SIZE}).', 'warning')
 
         options = {
             'gender_balance': 'gender_balance' in request.form,
@@ -1843,6 +1848,7 @@ def generate():
             'ib_min': ib_min,
             'ib_max': ib_max,
             'ib_class_size': ib_class_size,
+            'num_classes': num_classes_form,
         }
     else:
         sc = get_school_config()
@@ -1857,6 +1863,7 @@ def generate():
             'ib_min':        sc.get('ib_min', 2),
             'ib_max':        sc.get('ib_max', 5),
             'ib_class_size': sc.get('ib_class_size', 22),
+            'num_classes':   schulamt_max_classes,
         }
 
     # Klassenanzahl anpassen: Sportklassen-Isolation + ib_class_size-Reduktion berücksichtigen
@@ -1942,6 +1949,7 @@ def generate():
     session['last_proposals'] = proposals
 
     return render_template('generate.html', proposals=proposals, num_classes=num_classes, options=options,
+                           schulamt_max_classes=schulamt_max_classes,
                            existing_assignments=existing_assignments, selected_base_id=base_assignment_id,
                            wish_count=len(wishes))
 
