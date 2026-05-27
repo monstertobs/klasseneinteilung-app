@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.47
+Version: 0.1.48
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 27. Mai 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.47'
+__version__ = '0.1.48'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1876,7 +1876,7 @@ def generate():
     # Nicht-Sport-Kapazität sicherstellen
     if sport_count_opt > 0:
         non_sport_student_count = sum(1 for s in students if not s['sport_interesse'])
-        non_sport_classes_min = max(1, (non_sport_student_count + eff_max - 1) // eff_max)
+        non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
         num_classes = max(num_classes, sport_count_opt + non_sport_classes_min)
 
     # Basis-Einteilung laden (falls angegeben)
