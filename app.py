@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.50
+Version: 0.1.51
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 27. Mai 2026
+Date: 10. Juni 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.50'
+__version__ = '0.1.51'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -558,6 +558,14 @@ def validate_password(password):
         return False, "Passwort muss mindestens eine Ziffer enthalten."
 
     return True, ""
+
+def safe_int(value, default=0):
+    """Wandelt einen Formularwert robust in int um.
+    Nicht-numerische Eingaben (z.B. 'abc') führen zum default statt zu einem 500-Fehler."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 @app.route('/')
 def index():
@@ -1797,8 +1805,8 @@ def generate():
     # Optionen aus POST oder Standardwerte
     if request.method == 'POST':
         # IB Min/Max
-        ib_min = int(request.form.get('ib_min', '0'))
-        ib_max = int(request.form.get('ib_max', '0'))
+        ib_min = safe_int(request.form.get('ib_min', '0'), 0)
+        ib_max = safe_int(request.form.get('ib_max', '0'), 0)
 
         # Validierung: min <= max
         if ib_min > ib_max and ib_max > 0:
@@ -1808,10 +1816,10 @@ def generate():
 
         # Spezialklassen
         specialized_classes = {}
-        specialized_classes['sport'] = int(request.form.get('specialized_sport_count', '0'))
+        specialized_classes['sport'] = safe_int(request.form.get('specialized_sport_count', '0'), 0)
 
         # Freie Spezialklasse
-        custom_count = int(request.form.get('specialized_custom_count', '0'))
+        custom_count = safe_int(request.form.get('specialized_custom_count', '0'), 0)
         custom_name = request.form.get('specialized_custom_name', '').strip()
         if custom_count > 0 and custom_name:
             specialized_classes['custom'] = custom_count
@@ -1820,10 +1828,10 @@ def generate():
             specialized_classes['custom'] = 0
             specialized_classes['custom_name'] = ''
 
-        ib_class_size = int(request.form.get('ib_class_size', '22'))
+        ib_class_size = safe_int(request.form.get('ib_class_size', '22'), 22)
 
         # Klassenanzahl-Override aus Formular (früh lesen, damit Checks korrekt sind)
-        num_classes_form = int(request.form.get('num_classes', schulamt_max_classes))
+        num_classes_form = safe_int(request.form.get('num_classes', schulamt_max_classes), schulamt_max_classes)
         num_classes_form = max(1, min(20, num_classes_form))
         num_classes = num_classes_form
 
@@ -2772,7 +2780,7 @@ def _parse_new_changelog(changelog_text, current_ver):
 
 
 @app.route('/admin/update')
-@login_required
+@admin_required
 def check_update():
     """Update-Seite: prüft ob eine neuere Version auf GitHub verfügbar ist (via Releases API)."""
     import json as _json, urllib.request
@@ -2871,6 +2879,15 @@ def apply_update():
                 if top in PRESERVE_FILES or top in PRESERVE_DIRS:
                     continue
                 dest = os.path.join(app_dir, rel)
+                # Zip-Slip-Schutz: dest muss innerhalb von app_dir liegen
+                real_dest = os.path.realpath(dest)
+                if real_dest != os.path.realpath(app_dir) and \
+                   not real_dest.startswith(os.path.realpath(app_dir) + os.sep):
+                    continue
+                # Geschützte Pfade auch bei verschachtelten Traversal-Versuchen wahren
+                rel_top = os.path.relpath(real_dest, os.path.realpath(app_dir)).split(os.sep)[0]
+                if rel_top in PRESERVE_FILES or rel_top in PRESERVE_DIRS:
+                    continue
                 if member.endswith('/'):
                     os.makedirs(dest, exist_ok=True)
                 else:
@@ -4088,7 +4105,7 @@ def api_ki_config():
     if not KI_PROXY_TOKEN:
         return jsonify({'error': 'Proxy nicht konfiguriert.'}), 503
     token = request.headers.get('X-KI-Token', '')
-    if not token or token != KI_PROXY_TOKEN:
+    if not token or not secrets.compare_digest(token, KI_PROXY_TOKEN):
         return jsonify({'error': 'Ungültiges Token.'}), 403
     if not GEMINI_API_KEY:
         return jsonify({'error': 'Kein GEMINI_API_KEY konfiguriert.'}), 503

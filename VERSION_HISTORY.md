@@ -6,6 +6,22 @@
 
 ---
 
+## Version 0.1.51 - Security-Audit & Härtung
+**Release Date:** 10. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Security-Fixes (aus Penetration-Test / Audit)
+- **Authorization:** `/admin/update` (GET) war für jeden eingeloggten Nutzer erreichbar (`@login_required`) → jetzt `@admin_required`. Verhinderte Info-Disclosure von Versions-/Backup-Status für Nicht-Admins.
+- **Robustheit:** Nicht-numerische Eingaben in `/generate` (`num_classes`, `ib_min`, `ib_max`, `specialized_*_count`, `ib_class_size`) lösten einen ungefangenen 500-Fehler aus → neuer `safe_int()`-Helper fängt ungültige Werte ab.
+- **Timing-Angriff:** Token-Vergleich im KI-Proxy `/api/ki-config` nutzt jetzt `secrets.compare_digest()` statt `!=`.
+- **Zip-Slip:** Auto-Updater prüft nun, dass extrahierte Pfade innerhalb des App-Verzeichnisses bleiben (Defense-in-Depth gegen Pfad-Traversal beim Update).
+
+### Verifiziert
+- Live-Pentest bestätigt: CSRF-Schutz, Auth-Gating, Admin-Autorisierung, Datenisolation, Security-Header, kein SQLi/XSS.
+
+---
+
 ## Version 0.1.31 - Schüler-Info per Klick
 **Release Date:** 20. April 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
