@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Sportklassen-Größe — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Sportklassen-Größe bestätigen</h2>
+    </div>
+</div>
+
+<div class="card" style="max-width: 720px;">
+    <p style="font-size: 1.05rem;">
+        ⚠️ <strong>{{ num_sport }}</strong> Schüler mit Sportklassen-Wunsch passen nicht in
+        <strong>{{ chosen_sport }}</strong> Sportklasse{% if chosen_sport != 1 %}n{% endif %},
+        ohne die Richtgröße von <strong>{{ max_class_size }}</strong> Schülern pro Klasse zu überschreiten.
+    </p>
+    <p>Wie möchten Sie fortfahren?</p>
+
+    <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem;">
+
+        <form method="POST" action="{{ url_for('generate') }}" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% for k, v in hidden_fields.items() %}
+            <input type="hidden" name="{{ k }}" value="{{ v }}">
+            {% endfor %}
+            <input type="hidden" name="oversize_confirmed" value="1">
+            <input type="hidden" name="allow_oversize" value="0">
+            <button type="submit" class="btn btn-primary" style="width: 100%; text-align: left; padding: 1rem;">
+                <strong>{{ needed_sport }} Sportklassen öffnen</strong><br>
+                <span style="font-size: 0.9rem; opacity: 0.85;">
+                    ≈ {{ (num_sport / needed_sport) | round(0, 'floor') | int }}–{{ (num_sport / needed_sport) | round(0, 'ceil') | int }} Schüler pro Sportklasse, Grenze von {{ max_class_size }} wird eingehalten
+                </span>
+            </button>
+        </form>
+
+        <form method="POST" action="{{ url_for('generate') }}" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% for k, v in hidden_fields.items() %}
+            <input type="hidden" name="{{ k }}" value="{{ v }}">
+            {% endfor %}
+            <input type="hidden" name="oversize_confirmed" value="1">
+            <input type="hidden" name="allow_oversize" value="1">
+            <button type="submit" class="btn btn-secondary" style="width: 100%; text-align: left; padding: 1rem;">
+                <strong>Bei {{ chosen_sport }} Sportklasse{% if chosen_sport != 1 %}n{% endif %} bleiben</strong><br>
+                <span style="font-size: 0.9rem; opacity: 0.85;">
+                    ≈ {{ per_class_oversize }} Schüler pro Sportklasse — Grenze von {{ max_class_size }} wird überschritten
+                </span>
+            </button>
+        </form>
+
+        <a href="{{ url_for('generate') }}" style="text-align: center; color: #6c757d; margin-top: 0.5rem;">Abbrechen</a>
+    </div>
+</div>
+{% endblock %}

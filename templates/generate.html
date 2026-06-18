@@ -109,6 +109,11 @@
                     </select>
                 </label>
 
+                <label style="display: flex; align-items: center; gap: 0.4rem;" title="Wenn aktiviert, bleiben die gew&auml;hlten Sportklassen bestehen, auch wenn dadurch mehr als {{ MAX_CLASS_SIZE }} Sch&uuml;ler pro Sportklasse entstehen. Wenn nicht aktiviert, fragt die App nach bzw. &ouml;ffnet automatisch weitere Sportklassen.">
+                    <input type="checkbox" name="allow_oversize" value="1" {% if options.get('allow_oversize') %}checked{% endif %}>
+                    <span style="font-size: 0.9rem;">Max. {{ MAX_CLASS_SIZE }} Sch&uuml;ler/Sportklasse darf &uuml;berschritten werden</span>
+                </label>
+
                 <label style="display: flex; align-items: center; gap: 0.5rem;">
                     Weitere Spezialklasse:
                     <input type="text" name="specialized_custom_name" placeholder="z.B. Bläserklasse" value="{{ options.get('specialized_classes', {}).get('custom_name', '') }}" style="width: 12rem;" class="form-control">

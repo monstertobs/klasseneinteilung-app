@@ -6,6 +6,23 @@
 
 ---
 
+## Version 0.1.54 - Sportklassen-Größe wählbar (25er-Grenze)
+**Release Date:** 18. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature
+- **25er-Grenze für Sportklassen überschreitbar:** Reicht die gewählte Anzahl Sportklassen nicht, gibt es jetzt zwei Wege statt nur „weitere Klasse öffnen":
+  - **Checkbox** „Max. 25 Schüler/Sportklasse darf überschritten werden" im Generieren-Formular. Aktiviert → bei der gewählten Anzahl bleiben, Schüler gleichmäßig verteilen (z.B. 57 → 28/29 in 2 Klassen).
+  - **Interaktive Rückfrage-Seite**, wenn die Checkbox nicht gesetzt ist und ein Konflikt auftritt: zeigt konkrete Zahlen und zwei Buttons (weitere Sportklasse öffnen / 25er-Grenze überschreiten).
+- Sportklassen können jetzt ein eigenes, höheres Maximum haben (`sport_class_max`), während Normalklassen weiterhin bei 25 bleiben.
+- Garantie aus 0.1.53 bleibt: in Sportklassen nur Häkchen-Schüler, kein Häkchen-Schüler in Normalklasse.
+
+### Verifiziert
+- Echte Schul-Datei (57 Häkchen): Oversize 2 Klassen → 28/29, Auto-Open → 3×≤25; alle 3 Wege (Checkbox/Rückfrage „öffnen"/Rückfrage „überschreiten") end-to-end getestet, 0 Invarianten-Verletzungen.
+
+---
+
 ## Version 0.1.53 - Sportklassen-Kapazität (kritischer Fix)
 **Release Date:** 18. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

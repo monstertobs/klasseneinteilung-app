@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.53
+Version: 0.1.54
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 18. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.53'
+__version__ = '0.1.54'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1890,26 +1890,52 @@ def generate():
 
     # Sportklassen-Kapazität sicherstellen (GET UND POST):
     # In Sportklassen dürfen ausschließlich Schüler mit Sportklassen-Häkchen.
-    # Reicht die gewählte Anzahl Sportklassen nicht für alle Häkchen-Schüler,
-    # werden automatisch so viele Sportklassen geöffnet, dass alle hineinpassen
-    # (max. MAX_CLASS_SIZE pro Klasse) — niemand mit Häkchen landet in einer Normalklasse.
+    # Reicht die gewählte Anzahl Sportklassen nicht, gibt es zwei Wege:
+    #   a) weitere Sportklassen öffnen (max. MAX_CLASS_SIZE/Klasse einhalten)
+    #   b) bei der gewählten Anzahl bleiben und die 25er-Grenze überschreiten
+    # Ist die Checkbox "allow_oversize" nicht gesetzt, fragt eine Zwischenseite nach.
+    allow_oversize = request.form.get('allow_oversize') in ('1', 'on', 'true') if request.method == 'POST' else False
+    oversize_confirmed = request.form.get('oversize_confirmed') == '1' if request.method == 'POST' else False
+    options['allow_oversize'] = allow_oversize
+
     sport_count_opt = options.get('specialized_classes', {}).get('sport', 0)
     if sport_count_opt > 0:
         num_sport_students = sum(1 for s in students if s['sport_interesse'])
         non_sport_student_count = len(students) - num_sport_students
 
-        # So viele Sportklassen, dass alle Häkchen-Schüler hineinpassen
+        # So viele Sportklassen nötig, um die 25er-Grenze einzuhalten
         sport_classes_needed = max(1, (num_sport_students + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
-        effective_sport_count = max(sport_count_opt, sport_classes_needed)
+        conflict = sport_count_opt < sport_classes_needed
 
         # Genug Normalklassen für die übrigen Schüler
         non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE) \
             if non_sport_student_count > 0 else 0
 
-        if effective_sport_count > sport_count_opt:
-            flash(f'ℹ️ {num_sport_students} Schüler mit Sportklassen-Wunsch passen nicht in '
-                  f'{sport_count_opt} Sportklasse(n) (max. {MAX_CLASS_SIZE}/Klasse) — es werden '
-                  f'automatisch {effective_sport_count} Sportklassen geöffnet.', 'info')
+        # Konflikt + Checkbox nicht gesetzt + noch nicht bestätigt → interaktiv nachfragen
+        if request.method == 'POST' and conflict and not allow_oversize and not oversize_confirmed:
+            per_class_oversize = -(-num_sport_students // sport_count_opt)  # ceil
+            hidden_fields = {k: v for k, v in request.form.items()
+                             if k not in ('csrf_token', 'allow_oversize', 'oversize_confirmed')}
+            return render_template('generate_oversize_confirm.html',
+                                   num_sport=num_sport_students,
+                                   chosen_sport=sport_count_opt,
+                                   needed_sport=sport_classes_needed,
+                                   per_class_oversize=per_class_oversize,
+                                   max_class_size=MAX_CLASS_SIZE,
+                                   hidden_fields=hidden_fields)
+
+        if allow_oversize and conflict:
+            # Bei der gewählten Sportklassen-Anzahl bleiben, Grenze überschreiten
+            effective_sport_count = sport_count_opt
+            options['sport_class_max'] = -(-num_sport_students // sport_count_opt)  # ceil → gleichmäßig
+        else:
+            # Genug Sportklassen öffnen, um die 25er-Grenze einzuhalten
+            effective_sport_count = max(sport_count_opt, sport_classes_needed)
+            options['sport_class_max'] = MAX_CLASS_SIZE
+            if effective_sport_count > sport_count_opt:
+                flash(f'ℹ️ {num_sport_students} Schüler mit Sportklassen-Wunsch passen nicht in '
+                      f'{sport_count_opt} Sportklasse(n) (max. {MAX_CLASS_SIZE}/Klasse) — es werden '
+                      f'automatisch {effective_sport_count} Sportklassen geöffnet.', 'info')
 
         options['specialized_classes']['sport'] = effective_sport_count
         num_classes = max(num_classes, effective_sport_count + non_sport_classes_min)
@@ -1985,7 +2011,7 @@ def generate():
     session['last_proposals'] = proposals
 
     return render_template('generate.html', proposals=proposals, num_classes=num_classes, options=options,
-                           schulamt_max_classes=schulamt_max_classes,
+                           schulamt_max_classes=schulamt_max_classes, MAX_CLASS_SIZE=MAX_CLASS_SIZE,
                            existing_assignments=existing_assignments, selected_base_id=base_assignment_id,
                            wish_count=len(wishes))
 
@@ -2595,6 +2621,10 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
         effective_max = MAX_CLASS_SIZE
         if ib_class_size > 0 and ib_count[i] > 0:
             effective_max = ib_class_size
+        # Sportklassen dürfen die Standardgrenze überschreiten, wenn so konfiguriert
+        sport_class_max = options.get('sport_class_max', 0)
+        if sport_class_max and specialized_mapping.get(i) == 'sport':
+            effective_max = sport_class_max
         if len(cls) >= effective_max:
             score -= 10000
             scores.append(score)
