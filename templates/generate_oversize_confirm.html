@@ -10,9 +10,9 @@
 
 <div class="card" style="max-width: 720px;">
     <p style="font-size: 1.05rem;">
-        ⚠️ <strong>{{ num_sport }}</strong> Schüler mit Sportklassen-Wunsch passen nicht in
-        <strong>{{ chosen_sport }}</strong> Sportklasse{% if chosen_sport != 1 %}n{% endif %},
-        ohne die Richtgröße von <strong>{{ max_class_size }}</strong> Schülern pro Klasse zu überschreiten.
+        ⚠️ <strong>{{ num_sport }}</strong> Schüler mit Sportklassen-Wunsch lassen sich nicht auf
+        Sportklassen mit höchstens <strong>{{ max_class_size }}</strong> Schülern aufteilen,
+        ohne dafür {{ needed_sport }} Sportklassen zu öffnen.
     </p>
     <p>Wie möchten Sie fortfahren?</p>
 
@@ -28,7 +28,7 @@
             <button type="submit" class="btn btn-primary" style="width: 100%; text-align: left; padding: 1rem;">
                 <strong>{{ needed_sport }} Sportklassen öffnen</strong><br>
                 <span style="font-size: 0.9rem; opacity: 0.85;">
-                    ≈ {{ (num_sport / needed_sport) | round(0, 'floor') | int }}–{{ (num_sport / needed_sport) | round(0, 'ceil') | int }} Schüler pro Sportklasse, Grenze von {{ max_class_size }} wird eingehalten
+                    {% if strict_min == strict_max %}{{ strict_max }}{% else %}{{ strict_min }}–{{ strict_max }}{% endif %} Schüler pro Sportklasse, Grenze von {{ max_class_size }} wird eingehalten
                 </span>
             </button>
         </form>
@@ -41,9 +41,9 @@
             <input type="hidden" name="oversize_confirmed" value="1">
             <input type="hidden" name="allow_oversize" value="1">
             <button type="submit" class="btn btn-secondary" style="width: 100%; text-align: left; padding: 1rem;">
-                <strong>Bei {{ chosen_sport }} Sportklasse{% if chosen_sport != 1 %}n{% endif %} bleiben</strong><br>
+                <strong>{{ compact_sport }} Sportklasse{% if compact_sport != 1 %}n{% endif %} (kompakt)</strong><br>
                 <span style="font-size: 0.9rem; opacity: 0.85;">
-                    ≈ {{ per_class_oversize }} Schüler pro Sportklasse — Grenze von {{ max_class_size }} wird überschritten
+                    {% if compact_min == compact_max %}{{ compact_max }}{% else %}{{ compact_min }}–{{ compact_max }}{% endif %} Schüler pro Sportklasse — Grenze von {{ max_class_size }} wird überschritten
                 </span>
             </button>
         </form>

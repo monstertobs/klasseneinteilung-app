@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.55 - Sportklassen-Rückfrage: sinnvolle kompakte Option
+**Release Date:** 18. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Bugfix
+- **Kompakte Option in der Rückfrage war an die Eingabe gekoppelt** und konnte absurde Größen vorschlagen (z.B. bei Wahl „1 Sportklasse" → „57 Schüler in 1 Klasse"). Jetzt berechnet die App die kompakte Alternative unabhängig von der Eingabe: möglichst wenige Sportklassen, aber höchstens `SPORT_OVERSIZE_MAX` (30) Schüler pro Klasse. Für 57 Schüler → „2 Sportklassen (28–29)" statt „1 Sportklasse (57)".
+- Die Rückfrage wird nur noch angezeigt, wenn es tatsächlich eine sinnvollere kompakte Alternative gibt; sonst werden direkt genug Sportklassen geöffnet.
+
+---
+
 ## Version 0.1.54 - Sportklassen-Größe wählbar (25er-Grenze)
 **Release Date:** 18. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

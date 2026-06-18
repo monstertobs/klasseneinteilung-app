@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.54
+Version: 0.1.55
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 18. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.54'
+__version__ = '0.1.55'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -34,6 +34,7 @@ GITHUB_ZIP_URL = f'https://github.com/{GITHUB_REPO}/archive/refs/heads/main.zip'
 
 # Konstanten
 MAX_CLASS_SIZE = 25  # Maximale Anzahl Schüler pro Klasse
+SPORT_OVERSIZE_MAX = 30  # Obergrenze pro Sportklasse, wenn die 25er-Grenze bewusst überschritten wird
 __copyright__ = 'Copyright © 2026 Tobias Meier'
 __license__ = 'Proprietary'
 
@@ -1902,32 +1903,41 @@ def generate():
     if sport_count_opt > 0:
         num_sport_students = sum(1 for s in students if s['sport_interesse'])
         non_sport_student_count = len(students) - num_sport_students
+        ceil_div = lambda a, b: -(-a // b)
 
-        # So viele Sportklassen nötig, um die 25er-Grenze einzuhalten
-        sport_classes_needed = max(1, (num_sport_students + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
+        # Strikt: so viele Sportklassen, dass die 25er-Grenze eingehalten wird
+        sport_classes_needed = max(1, ceil_div(num_sport_students, MAX_CLASS_SIZE))
+        # Kompakt: wenige Klassen, aber höchstens SPORT_OVERSIZE_MAX pro Klasse;
+        # respektiert eine explizit höhere Wahl, vermeidet aber absurde Größen (z.B. 57 in 1 Klasse)
+        compact_count = max(sport_count_opt, ceil_div(num_sport_students, SPORT_OVERSIZE_MAX))
+        compact_count = min(compact_count, sport_classes_needed)
         conflict = sport_count_opt < sport_classes_needed
 
         # Genug Normalklassen für die übrigen Schüler
-        non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE) \
+        non_sport_classes_min = max(1, ceil_div(non_sport_student_count, MAX_CLASS_SIZE)) \
             if non_sport_student_count > 0 else 0
 
-        # Konflikt + Checkbox nicht gesetzt + noch nicht bestätigt → interaktiv nachfragen
-        if request.method == 'POST' and conflict and not allow_oversize and not oversize_confirmed:
-            per_class_oversize = -(-num_sport_students // sport_count_opt)  # ceil
+        # Konflikt + Checkbox nicht gesetzt + noch nicht bestätigt
+        # + es gibt überhaupt eine kompaktere Alternative → interaktiv nachfragen
+        if (request.method == 'POST' and conflict and not allow_oversize
+                and not oversize_confirmed and compact_count < sport_classes_needed):
             hidden_fields = {k: v for k, v in request.form.items()
                              if k not in ('csrf_token', 'allow_oversize', 'oversize_confirmed')}
             return render_template('generate_oversize_confirm.html',
                                    num_sport=num_sport_students,
-                                   chosen_sport=sport_count_opt,
                                    needed_sport=sport_classes_needed,
-                                   per_class_oversize=per_class_oversize,
+                                   strict_min=num_sport_students // sport_classes_needed,
+                                   strict_max=ceil_div(num_sport_students, sport_classes_needed),
+                                   compact_sport=compact_count,
+                                   compact_min=num_sport_students // compact_count,
+                                   compact_max=ceil_div(num_sport_students, compact_count),
                                    max_class_size=MAX_CLASS_SIZE,
                                    hidden_fields=hidden_fields)
 
         if allow_oversize and conflict:
-            # Bei der gewählten Sportklassen-Anzahl bleiben, Grenze überschreiten
-            effective_sport_count = sport_count_opt
-            options['sport_class_max'] = -(-num_sport_students // sport_count_opt)  # ceil → gleichmäßig
+            # Kompakt bleiben, 25er-Grenze überschreiten (max. SPORT_OVERSIZE_MAX/Klasse)
+            effective_sport_count = compact_count
+            options['sport_class_max'] = ceil_div(num_sport_students, compact_count)
         else:
             # Genug Sportklassen öffnen, um die 25er-Grenze einzuhalten
             effective_sport_count = max(sport_count_opt, sport_classes_needed)
