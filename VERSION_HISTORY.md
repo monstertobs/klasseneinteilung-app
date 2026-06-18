@@ -6,6 +6,21 @@
 
 ---
 
+## Version 0.1.52 - Import-Verbesserungen (Religion & Sportklasse)
+**Release Date:** 18. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Import-Fixes (nach Abgleich echter Schul-Exportdatei)
+- **Religion:** Import bevorzugt jetzt die Spalte "Religionsunterricht" (Ethik/Ev/Kath) statt "Religion" (Konfession). Bei leerem Religionsunterricht wird auf die Konfession zurückgegriffen. Deutlich korrektere Religionsverteilung für die Einteilung.
+- **Konfession:** Die Spalte "Religion"/"Konfession" wird – wenn eine separate "Religionsunterricht"-Spalte existiert – zusätzlich als Info in den Notizen festgehalten (z.B. "Konfession: …").
+- **Sportklasse:** Erkennung toleriert jetzt "X" mit Kommentar (z.B. "X Sportattest liegt vor") sowie das ausgeschriebene Wort "Sportklasse". Vorher wurde nur exakt "X" erkannt → an einer Realdatei stieg die Trefferzahl von 37 auf 57.
+
+### Hinweis
+- Unklare/leere Werte in der "Eignung"-Spalte (Schulform) müssen weiterhin in der Quelldatei bereinigt werden – das kann der Import nicht erraten.
+
+---
+
 ## Version 0.1.51 - Security-Audit & Härtung
 **Release Date:** 10. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

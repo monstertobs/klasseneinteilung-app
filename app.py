@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.51
+Version: 0.1.52
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 10. Juni 2026
+Date: 18. Juni 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.51'
+__version__ = '0.1.52'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1017,7 +1017,7 @@ def process_import_data(data, batch_id):
         'gender': ['geschlecht', 'gender', 'sex'],
         'wohnort': ['wohnort', 'ort', 'adresse', 'address', 'schulweg', 'location', 'slr_wonadresse', 'slr_wohnadresse'],
         'schulform': ['schulform', 'schule', 'school_type', 'bildungsgang', 'eignung'],
-        'religion': ['religion', 'konfession', 'wahlfach religion'],
+        'religion': ['religionsunterricht', 'religion', 'konfession', 'wahlfach religion'],
         'sportlich': ['sportlich', 'athletic', 'sporty'],
         'sport_interesse': ['sportklasse'],  # Sportklassen-Hacken = Schüler soll in Sportklasse
         # Hinweis: 'Sportattest' wird absichtlich ignoriert (nur Attests-Status, kein Einfluss auf Sportklasse)
@@ -1102,9 +1102,15 @@ def process_import_data(data, batch_id):
                                 student_data['sportlich'] = 0
                                 row_warnings.append(f'Sportlich "{str(value).strip()}" nicht erkannt — erwartet: ja / nein')
                         elif db_field == 'sport_interesse':
-                            sportlich_values = ['ja', 'yes', '1', 'true', 'x']
                             val_low = str(value).lower().strip()
-                            student_data['sport_interesse'] = 1 if val_low in sportlich_values else 0
+                            # Erkennt auch "X" mit Kommentar (z.B. "X Sportattest liegt vor")
+                            # und das ausgeschriebene Wort "Sportklasse"
+                            is_sport = (
+                                val_low in ('ja', 'yes', '1', 'true', 'x')
+                                or val_low[:2] == 'x '
+                                or 'sportklasse' in val_low
+                            )
+                            student_data['sport_interesse'] = 1 if is_sport else 0
                         elif db_field == 'special_needs':
                             sn_val = str(value).strip().lower()
                             known_sn = {'hoerschaedigung', 'sprache', 'sozial_emotional', 'lernen', 'sehen', 'kme'}
@@ -1115,6 +1121,14 @@ def process_import_data(data, batch_id):
                             # Alle Notizen sammeln
                             notes_parts.append(f"{possible_name.title()}: {str(value).strip()}")
                         break
+
+            # Konfession zusätzlich als Info in den Notizen festhalten
+            # (nur wenn eine getrennte "Religionsunterricht"-Spalte existiert – dann ist
+            #  "Religion"/"Konfession" die Mitgliedschaft, nicht der besuchte Unterricht)
+            if 'religionsunterricht' in row_lower:
+                konfession_raw = str(row_lower.get('religion') or row_lower.get('konfession') or '').strip()
+                if konfession_raw and konfession_raw.lower() not in ('ethik', 'leer', 'keine', 'sonstige/keine'):
+                    notes_parts.append(f"Konfession: {konfession_raw}")
 
             # Spezielle Spalten verarbeiten
             for special_field, possible_names in special_columns.items():
