@@ -6,6 +6,18 @@
 
 ---
 
+## Version 0.1.53 - Sportklassen-Kapazität (kritischer Fix)
+**Release Date:** 18. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Kritischer Bugfix
+- **Sportklassen-Überlauf behoben:** Reichte die gewählte Anzahl Sportklassen nicht für alle Schüler mit Sportklassen-Häkchen, landeten die überzähligen Häkchen-Schüler bisher in Normalklassen. Jetzt öffnet die App automatisch so viele Sportklassen, dass ALLE Häkchen-Schüler hineinpassen (max. 25/Klasse), und erhöht bei Bedarf die Gesamt-Klassenzahl. Ein Info-Hinweis informiert über die automatische Anpassung.
+- **Garantie:** In Sportklassen sind ausschließlich Schüler mit Häkchen; kein Häkchen-Schüler landet in einer Normalklasse. An echter Schul-Datei verifiziert (57 Häkchen-Schüler, 1 gewählte Sportklasse → 3 automatisch geöffnet, 0 Verletzungen über alle 3 Vorschläge).
+- Die Kapazitätsprüfung läuft jetzt bei GET und POST (vorher nur GET, und nur für Normalklassen).
+
+---
+
 ## Version 0.1.52 - Import-Verbesserungen (Religion & Sportklasse)
 **Release Date:** 18. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

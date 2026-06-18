@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.52
+Version: 0.1.53
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 18. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.52'
+__version__ = '0.1.53'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1888,13 +1888,32 @@ def generate():
             'num_classes':   schulamt_max_classes,
         }
 
-    # Bei GET: Spezialklassen-Mindestanzahl sicherstellen (Nutzer hat noch nicht explizit gewählt)
-    if request.method == 'GET':
-        sport_count_opt = options.get('specialized_classes', {}).get('sport', 0)
-        if sport_count_opt > 0:
-            non_sport_student_count = sum(1 for s in students if not s['sport_interesse'])
-            non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
-            num_classes = max(num_classes, sport_count_opt + non_sport_classes_min)
+    # Sportklassen-Kapazität sicherstellen (GET UND POST):
+    # In Sportklassen dürfen ausschließlich Schüler mit Sportklassen-Häkchen.
+    # Reicht die gewählte Anzahl Sportklassen nicht für alle Häkchen-Schüler,
+    # werden automatisch so viele Sportklassen geöffnet, dass alle hineinpassen
+    # (max. MAX_CLASS_SIZE pro Klasse) — niemand mit Häkchen landet in einer Normalklasse.
+    sport_count_opt = options.get('specialized_classes', {}).get('sport', 0)
+    if sport_count_opt > 0:
+        num_sport_students = sum(1 for s in students if s['sport_interesse'])
+        non_sport_student_count = len(students) - num_sport_students
+
+        # So viele Sportklassen, dass alle Häkchen-Schüler hineinpassen
+        sport_classes_needed = max(1, (num_sport_students + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE)
+        effective_sport_count = max(sport_count_opt, sport_classes_needed)
+
+        # Genug Normalklassen für die übrigen Schüler
+        non_sport_classes_min = max(1, (non_sport_student_count + MAX_CLASS_SIZE - 1) // MAX_CLASS_SIZE) \
+            if non_sport_student_count > 0 else 0
+
+        if effective_sport_count > sport_count_opt:
+            flash(f'ℹ️ {num_sport_students} Schüler mit Sportklassen-Wunsch passen nicht in '
+                  f'{sport_count_opt} Sportklasse(n) (max. {MAX_CLASS_SIZE}/Klasse) — es werden '
+                  f'automatisch {effective_sport_count} Sportklassen geöffnet.', 'info')
+
+        options['specialized_classes']['sport'] = effective_sport_count
+        num_classes = max(num_classes, effective_sport_count + non_sport_classes_min)
+        options['num_classes'] = num_classes
 
     # Basis-Einteilung laden (falls angegeben)
     base_assignment = None
