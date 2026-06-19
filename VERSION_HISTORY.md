@@ -6,6 +6,19 @@
 
 ---
 
+## Version 0.1.56 - Wunsch-Zuordnung bei mehreren Vornamen
+**Release Date:** 18. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserung
+- **Freundschaftswünsche werden jetzt auch bei mehreren Vornamen zugeordnet.** Bisher klappte die Zuordnung nur bei exakt „ein Vorname + ein Nachname"; bei Schülern mit zwei/drei Vornamen (z.B. „Anna Maria Müller") oder abweichender Reihenfolge schlug sie fehl.
+- Neues Matching: Anker ist der **Nachname** (muss vollständig vorkommen) plus **mindestens ein übereinstimmender Vorname**; Reihenfolge egal, Bindestrich-Namen werden zerlegt.
+- **Mehrdeutige Namen** (mehrere gleich gut passende Schüler) werden nicht mehr falsch geraten, sondern als Warnung zur manuellen Zuordnung gemeldet.
+- An echter Schul-Datei: verknüpfte Wünsche von 86 → **147** gestiegen.
+
+---
+
 ## Version 0.1.55 - Sportklassen-Rückfrage: sinnvolle kompakte Option
 **Release Date:** 18. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

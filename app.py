@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.55
+Version: 0.1.56
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 18. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.55'
+__version__ = '0.1.56'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1001,6 +1001,44 @@ def import_students():
 
     return render_template('import_students.html', excel_support=EXCEL_SUPPORT)
 
+def _name_tokens(s):
+    """Zerlegt einen Namen in normalisierte Tokens (Kleinbuchstaben, ohne Bindestriche/Kommas/Punkte)."""
+    if not s:
+        return []
+    s = str(s).lower().replace('-', ' ').replace(',', ' ').replace('.', ' ')
+    return [t for t in s.split() if t]
+
+
+def _find_student_by_name(related_name, all_students):
+    """Findet den zu einem frei eingegebenen Namen passenden Schüler.
+
+    Toleriert mehrere Vornamen und beliebige Reihenfolge. Anker ist der Nachname:
+    alle Nachname-Tokens müssen im Wunschnamen vorkommen, plus mindestens ein Vorname.
+    Gibt (student_id, status) zurück — status: 'ok', 'none' oder 'ambiguous'.
+    """
+    w = set(_name_tokens(related_name))
+    if len(w) < 2:
+        return None, 'none'  # nur ein Wort (z.B. nur Vorname) → nicht eindeutig genug
+    candidates = []
+    for st in all_students:
+        first, last = st['first_tokens'], st['last_tokens']
+        if not first or not last:
+            continue
+        # Nachname muss vollständig vorkommen UND mindestens ein Vorname muss übereinstimmen
+        if all(t in w for t in last) and any(t in w for t in first):
+            exact = 1 if w == st['all_tokens'] else 0
+            overlap = len(w & st['all_tokens'])
+            candidates.append((exact, overlap, st['id']))
+    if not candidates:
+        return None, 'none'
+    candidates.sort(reverse=True)
+    best = candidates[0]
+    # Mehrdeutig, wenn mehrere Schüler gleich gut passen → nicht raten
+    if sum(1 for c in candidates if c[0] == best[0] and c[1] == best[1]) > 1:
+        return None, 'ambiguous'
+    return best[2], 'ok'
+
+
 def process_import_data(data, batch_id):
     """Verarbeitet Import-Daten (CSV oder Excel)"""
     db = get_db()
@@ -1244,6 +1282,16 @@ def process_import_data(data, batch_id):
 
     db.commit()
 
+    # Alle Schüler einmalig für flexibles Namens-Matching laden
+    import re
+    cursor.execute('SELECT id, firstname, lastname FROM students')
+    all_students = []
+    for r in cursor.fetchall():
+        ft = _name_tokens(r['firstname'])
+        lt = _name_tokens(r['lastname'])
+        all_students.append({'id': r['id'], 'first_tokens': ft, 'last_tokens': lt,
+                             'all_tokens': set(ft + lt)})
+
     # Freundewünsche verarbeiten (nach dem Commit, damit alle Schüler in der DB sind)
     wishes_created = 0
     for wish in wish_data:
@@ -1251,7 +1299,6 @@ def process_import_data(data, batch_id):
             # Namen aus der related_names Spalte extrahieren (kann mehrere Namen enthalten)
             related_names_raw = wish['related_names']
             # Namen können durch Komma, Semikolon oder "und" getrennt sein
-            import re
             name_list = re.split(r'[,;]|\sund\s', related_names_raw)
 
             for related_name in name_list:
@@ -1259,27 +1306,13 @@ def process_import_data(data, batch_id):
                 if not related_name:
                     continue
 
-                # Namen splitten (Vorname Nachname oder Nachname, Vorname)
-                name_parts = related_name.replace(',', ' ').split()
-                if len(name_parts) < 2:
+                # Robuste Zuordnung (toleriert mehrere Vornamen, Reihenfolge)
+                related_student_id, match_status = _find_student_by_name(related_name, all_students)
+
+                if match_status == 'ambiguous':
+                    errors.append({'row': '—', 'name': wish['student_name'], 'type': 'warning',
+                                   'reason': f"Wunsch: '{related_name}' ist mehrdeutig (mehrere passende Schüler) — bitte manuell zuordnen"})
                     continue
-
-                # Versuche verschiedene Kombinationen (Vorname Nachname und Nachname Vorname)
-                possible_combinations = [
-                    (name_parts[0], name_parts[1]),  # Vorname Nachname
-                    (name_parts[1], name_parts[0])   # Nachname Vorname
-                ]
-
-                related_student_id = None
-                for first, last in possible_combinations:
-                    cursor.execute('''
-                        SELECT id FROM students
-                        WHERE LOWER(firstname) = LOWER(?) AND LOWER(lastname) = LOWER(?)
-                    ''', (first, last))
-                    result = cursor.fetchone()
-                    if result:
-                        related_student_id = result['id']
-                        break
 
                 if related_student_id and related_student_id != wish['student_id']:
                     # Prüfen ob Wunsch schon existiert (verhindert Duplikate)
