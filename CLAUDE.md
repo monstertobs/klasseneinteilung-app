@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **security-hardened**, DSGVO-compliant Flask web application for generating school class divisions (5th grade). Considers parent wishes, gender balance, school routes (wohnort), school type (schulform), religion, special needs, and athletic ability. Designed for deployment on All-Inkl shared hosting with local SQLite storage.
 
-**Current version:** 0.1.56 (18. Juni 2026)
+**Current version:** 0.1.57 (19. Juni 2026)
 
 **Production:** Hetzner VPS, app path `/opt/klasseneinteilung/`, systemd service `klasseneinteilung`. Deploy via paramiko (password auth); `sshpass` not available on macOS.
 
@@ -156,17 +156,23 @@ num_ib_classes = min(num_classes, num_ib // ib_min)
 ```
 `optimize_assignment_wishes` checks `ib_move_allowed()` before any swap involving an IB student.
 
-**Scoring weights (highest to lowest priority):**
-1. Hard limit full class: −10000
-2. Freundewünsche: +150 together / −500 separated (bidirectional via `reverse_wish_dict`)
-3. Geschlechterbalance: −15 per gender ratio concentration
-4. Stadt-Gruppierung: +20 per student from same city
-5. PLZ-Gruppierung: +10 per student from same postal code
+**Scoring weights (highest to lowest priority) — Reihenfolge per Schulleitung 06/2026:**
+1. Hard limit full class: −10000 (sport classes use `sport_class_max`)
+2. Freundewünsche: +200 together / −5000 separated (bidirectional via `reverse_wish_dict`)
+3. Stadt-Gruppierung: +20 per student from same city
+4. PLZ-Gruppierung: +10 per student from same postal code
+5. Religion-Verteilung: −12 per ratio concentration (`religion_distribute`)
 6. Schulform-Verteilung: −8 per ratio concentration
-7. Religion: −2 per ratio concentration
+7. Geschlechterbalance: −4 per gender ratio concentration
 8. Size balance: −10 per size deviation from average
 9. IB max hard block: −1000 (normal IB placement handled by pre-assignment above)
-10. Sport-Spezialklasse: +50 / −20 depending on sport_interesse
+10. Sport-Spezialklasse: +500 sport_interesse in sport class / −100000 non-sport in sport class
+
+**Wunsch-Garantie (Schulleitung 06/2026):** `optimize_assignment_wishes` bewertet primär die
+*coverage* (Anzahl Schüler mit ≥1 erfülltem Zusammen-Wunsch, gewichtet ×1000), erst sekundär die
+Gesamtzahl erfüllter Wünsche. So bekommt jeder Wunsch-Schüler zuerst einen Wunsch erfüllt, bevor
+weitere Wünsche optimiert werden — soweit harte Regeln (Klassengröße, Sportklasse, Trennung, IB)
+es zulassen. Wünsche zwischen Sport- und Nicht-Sport-Schülern sind strukturell nicht erfüllbar.
 
 **Smart initial ordering:** Students most-wished-for by others are placed first. IB students are extracted and pre-assigned before this ordering runs.
 

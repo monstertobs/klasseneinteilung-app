@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.56
+Version: 0.1.57
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 18. Juni 2026
+Date: 19. Juni 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.56'
+__version__ = '0.1.57'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2082,7 +2082,7 @@ def extract_plz_from_wohnort(wohnort):
         return match.group(1)
     return None
 
-def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, pinned_student_ids=None, specialized_mapping=None):
+def optimize_assignment_wishes(classes, wish_dict, max_rounds=250, options=None, pinned_student_ids=None, specialized_mapping=None):
     """
     Post-Processing: Verbessert Wunsch-Erfüllungsrate durch iterativen Schüler-Tausch.
     - Tauscht bevorzugt gleichgeschlechtliche Schüler (Geschlechterbalance bleibt erhalten)
@@ -2119,6 +2119,15 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
     def ib_count_for(cls):
         return sum(1 for s in cls if s.get('schulform') == 'IB')
 
+    def effective_max(idx):
+        """Maximale Klassengröße für eine Klasse (berücksichtigt Sport-/IB-Sonderlimits)."""
+        if specialized_mapping.get(idx) == 'sport' and options.get('sport_class_max'):
+            return options['sport_class_max']
+        ib_cs = options.get('ib_class_size', 0)
+        if ib_cs and ib_count_for(classes[idx]) > 0:
+            return ib_cs
+        return MAX_CLASS_SIZE
+
     def ib_move_allowed(student, from_cls, to_cls):
         """Prüft ob Verschieben eines IB-Schülers die Constraints verletzt."""
         if student.get('schulform') != 'IB' or ib_min == 0:
@@ -2142,20 +2151,31 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
     all_students = {s['id']: s for cls in classes for s in cls}
 
     def total_wish_score():
-        score = 0
+        # Priorität 1 (Schulleitung 06/2026): möglichst viele Schüler mit MINDESTENS einem
+        # erfüllten Zusammen-Wunsch ("coverage"). Priorität 2: Gesamtzahl erfüllter Wünsche.
+        # coverage wird mit 1000 gewichtet, damit der erste Wunsch immer vor weiteren kommt.
+        coverage = 0
+        total = 0
         for sid, wlist in wish_dict.items():
             if sid not in student_to_class:
                 continue
+            has_together = False
+            got_one = False
             for w in wlist:
                 rid = w['related_student_id']
                 if not rid or rid not in student_to_class:
                     continue
                 same = student_to_class[sid] == student_to_class[rid]
-                if w['wish_type'] == 'together' and same:
-                    score += 1
+                if w['wish_type'] == 'together':
+                    has_together = True
+                    if same:
+                        total += 1
+                        got_one = True
                 elif w['wish_type'] == 'separated' and not same:
-                    score += 1
-        return score
+                    total += 1
+            if has_together and got_one:
+                coverage += 1
+        return coverage * 1000 + total
 
     current_score = total_wish_score()
 
@@ -2186,7 +2206,7 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
                 gender = s_obj.get('gender', '')
 
                 # Option 1: Verschiebe sid nach class_b wenn Platz vorhanden
-                if (len(classes[class_b]) < MAX_CLASS_SIZE
+                if (len(classes[class_b]) < effective_max(class_b)
                         and ib_move_allowed(s_obj, classes[class_a], classes[class_b])
                         and sport_move_allowed(s_obj, class_a, class_b)):
                     student_to_class[sid] = class_b
@@ -2262,7 +2282,7 @@ def optimize_assignment_wishes(classes, wish_dict, max_rounds=60, options=None, 
                     for target in range(num_classes):
                         if target == class_a:
                             continue
-                        if len(classes[target]) >= MAX_CLASS_SIZE:
+                        if len(classes[target]) >= effective_max(target):
                             continue
                         if not ib_move_allowed(s_obj, classes[class_a], classes[target]):
                             continue
@@ -2729,7 +2749,7 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                 total = sum(gender_count[i].values())
                 if total > 0:
                     gender_ratio = gender_count[i][gender] / total
-                    score -= gender_ratio * 15  # Erhöht von 5 auf 15 für höhere Priorität
+                    score -= gender_ratio * 4  # Niedrigste Verteilungs-Priorität (Schulleitung 06/2026)
 
         # Schulweg-Gruppierung (WICHTIG - Schüler aus gleicher Stadt/PLZ zusammen)
         if options.get('schulweg_gruppe', True):
@@ -2763,7 +2783,7 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                 total = sum(religion_count[i].values())
                 if total > 0:
                     rel_ratio = religion_count[i][religion] / total
-                    score -= rel_ratio * 2  # Reduziert von 5 auf 2
+                    score -= rel_ratio * 12  # Höchstes Verteilungskriterium nach Schulweg (Schulleitung 06/2026)
 
         # Religion gruppieren (ZWEITRANGIG - reduzierte Priorität)
         if options.get('religion_group', False):
@@ -2797,7 +2817,7 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                     continue
                 related_in_class = any(s['id'] == related_id for s in cls)
                 if wish_type == 'together' and related_in_class:
-                    score += 150   # Sehr hoher Bonus: "mit Freund/in zusammen"
+                    score += 200   # Höchste Priorität: "mit Freund/in zusammen"
                 elif wish_type == 'separated' and related_in_class:
                     score -= 5000  # Harte Sperre: "Auf keinen Fall mit" (quasi unüberwindbar)
 
@@ -2808,7 +2828,7 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                 wisher_id = wish['student_id']
                 wisher_in_class = any(s['id'] == wisher_id for s in cls)
                 if wish_type == 'together' and wisher_in_class:
-                    score += 150   # Wunschsteller ist bereits in dieser Klasse → Bonus
+                    score += 200   # Wunschsteller ist bereits in dieser Klasse → Bonus
                 elif wish_type == 'separated' and wisher_in_class:
                     score -= 500   # Wunschsteller ist bereits in dieser Klasse → Strafe
 

@@ -6,6 +6,21 @@
 
 ---
 
+## Version 0.1.57 - Wunsch-Garantie + neue Prioritäten (Schulleitung)
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Änderungen nach Feedback des Schulleitungsteams
+- **Mindestens ein Freundschaftswunsch garantiert:** Der Optimierer bewertet jetzt primär die *coverage* (Anzahl Schüler mit ≥1 erfülltem Zusammen-Wunsch, ×1000 gewichtet), erst dann die Gesamtzahl. Jeder Schüler mit Wunsch bekommt zuerst einen erfüllt, weitere Wünsche danach — soweit harte Regeln es zulassen. An echter Datei: Coverage ~100 % (ohne Sportklassen).
+- **Neue Prioritäten-Reihenfolge der Verteilung:** 1 garantierter Wunsch → Schulweg/Wohnort → Religion → Schulform → Geschlecht. Konkret: Religion-Gewicht 2→12, Schulform 8 (unverändert), Geschlecht 15→4, Zusammen-Wunsch 150→200.
+- Optimierer-Runden 60→250 und korrekte Kapazitätsprüfung pro Klasse (`effective_max`, berücksichtigt Sport-/IB-Sonderlimits).
+
+### Hinweis
+- Wünsche zwischen einem Sport- und einem Nicht-Sport-Kind sind strukturell nicht erfüllbar (verschiedene Klassentypen).
+
+---
+
 ## Version 0.1.56 - Wunsch-Zuordnung bei mehreren Vornamen
 **Release Date:** 18. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
