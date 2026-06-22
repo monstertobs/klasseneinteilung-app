@@ -6,6 +6,20 @@
 
 ---
 
+## Version 0.1.60 - Alphabetische Listen + Klassennamen änderbar
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neue Features (Wünsche Schulleitungsteam)
+- **Alphabetische Sortierung:** Schüler werden in jeder Klasse nach Nachname, Vorname sortiert — in der Vorschau, der gespeicherten Ansicht und allen Exporten (Excel/CSV/PDF). (Exporte sortierten schon vorher; jetzt auch die Bildschirm-Ansicht.)
+- **Klassennamen änderbar:** In einer gespeicherten Einteilung können die Klassen umbenannt werden (Button „Klassen umbenennen" → Panel mit einem Feld je Klasse). Standardnamen bleiben 5a, 5b, 5c … Die Namen werden gespeichert und in alle Exporte sowie den Vergleich übernommen. Neue Route `/assignments/<id>/rename`.
+
+### Technisch
+- Jede Klasse hat jetzt ein editierbares Feld `name` (Default „5a"…). Exporte nutzen `_class_label()` mit Fallback für ältere Einteilungen. Excel-Sheet-Titel werden auf gültige Zeichen/Länge bereinigt.
+
+---
+
 ## Version 0.1.59 - Wunsch-Zuordnung bei mehreren Nachnamen
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

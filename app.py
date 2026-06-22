@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.59
+Version: 0.1.60
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.59'
+__version__ = '0.1.60'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2652,9 +2652,14 @@ def generate_class_assignment(students, wishes, num_classes, seed, options, base
         is_sportklasse = options.get('sportklasse', False) and i == 0  # Backward compatibility
         custom_name = options.get('specialized_classes', {}).get('custom_name', '') if special_type == 'custom' else ''
 
+        # Standard-Klassenname (editierbar): 5a, 5b, … (ab 27 Klassen: "Klasse N")
+        default_name = ('5' + 'abcdefghijklmnopqrstuvwxyz'[i]) if i < 26 else f'Klasse {i + 1}'
+
         result['classes'].append({
             'number': i + 1,
-            'students': cls,
+            'name': default_name,
+            'students': sorted(cls, key=lambda s: ((s.get('lastname') or '').strip().lower(),
+                                                   (s.get('firstname') or '').strip().lower())),
             'count': len(cls),
             'gender_count': gender_count[i],
             'wohnort_count': wohnort_count[i],
@@ -3175,7 +3180,7 @@ def compare_assignments():
         m = {}
         for cls in proposal.get('classes', []):
             for s in cls.get('students', []):
-                m[s['id']] = {'class_name': cls['name'], 'firstname': s.get('firstname', ''), 'lastname': s.get('lastname', '')}
+                m[s['id']] = {'class_name': _class_label(cls), 'firstname': s.get('firstname', ''), 'lastname': s.get('lastname', '')}
         return m
 
     map_a = build_map(_json.loads(assignment_a['data']))
@@ -3283,6 +3288,8 @@ def update_assignment(assignment_id):
         cls_num = str(cls['number'])
         new_students = [all_students[sid] for sid, cnum in arrangement.items()
                         if cnum == cls_num and sid in all_students]
+        new_students.sort(key=lambda s: ((s.get('lastname') or '').strip().lower(),
+                                          (s.get('firstname') or '').strip().lower()))
         cls['students'] = new_students
         cls['count'] = len(new_students)
         cls['gender_count'] = {
@@ -3304,6 +3311,40 @@ def update_assignment(assignment_id):
     db.close()
 
     flash('Einteilung erfolgreich gespeichert.', 'success')
+    return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
+
+@app.route('/assignments/<int:assignment_id>/rename', methods=['POST'])
+@login_required
+def rename_classes(assignment_id):
+    """Klassennamen einer gespeicherten Einteilung ändern."""
+    import json
+    db = get_db()
+    row = db.execute('SELECT data FROM class_assignments WHERE id = ?', (assignment_id,)).fetchone()
+    if not row:
+        db.close()
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+
+    proposal = json.loads(row['data'])
+    changed = 0
+    for cls in proposal.get('classes', []):
+        # Feldname im Formular: class_name_<number>
+        new_name = (request.form.get(f"class_name_{cls.get('number')}", '') or '').strip()
+        if new_name:
+            new_name = new_name[:40]  # Längenbegrenzung
+            if new_name != cls.get('name'):
+                cls['name'] = new_name
+                changed += 1
+
+    if changed:
+        db.execute('UPDATE class_assignments SET data = ? WHERE id = ?',
+                   (json.dumps(proposal), assignment_id))
+        db.commit()
+        flash(f'{changed} Klassenname(n) aktualisiert.', 'success')
+    else:
+        flash('Keine Änderung an den Klassennamen.', 'info')
+    db.close()
     return redirect(url_for('view_assignment', assignment_id=assignment_id))
 
 
@@ -3399,6 +3440,15 @@ def export_classes(format_type):
         flash(f'Fehler beim Export: {str(e)}', 'danger')
         return redirect(url_for('generate'))
 
+def _class_label(class_data):
+    """Anzeigename einer Klasse: benutzerdefinierter Name oder Standard '5a', '5b', …"""
+    name = (class_data.get('name') or '').strip()
+    if name:
+        return name
+    num = class_data.get('number', 1)
+    return ('5' + 'abcdefghijklmnopqrstuvwxyz'[num - 1]) if 1 <= num <= 26 else f'Klasse {num}'
+
+
 def generate_excel_export(proposal):
     """Generiert Excel-Export"""
     from openpyxl import Workbook
@@ -3410,12 +3460,20 @@ def generate_excel_export(proposal):
     wb.remove(wb.active)  # Entferne leeres Sheet
 
     # Erstelle ein Sheet pro Klasse
+    import re as _re
+    used_titles = set()
     for class_data in proposal['classes']:
-        class_name = f"5{chr(96 + class_data['number'])}"
-        ws = wb.create_sheet(title=class_name)
+        class_name = _class_label(class_data)
+        # Excel-Sheet-Titel: max. 31 Zeichen, keine Sonderzeichen : \ / ? * [ ]
+        sheet_title = _re.sub(r'[:\\/?*\[\]]', ' ', class_name)[:31].strip() or f"Klasse {class_data['number']}"
+        base = sheet_title; n = 2
+        while sheet_title.lower() in used_titles:
+            sheet_title = f"{base[:28]} {n}"; n += 1
+        used_titles.add(sheet_title.lower())
+        ws = wb.create_sheet(title=sheet_title)
 
         # Header
-        ws['A1'] = f"Klasse {class_name}"
+        ws["A1"] = class_name
         ws['A1'].font = Font(size=14, bold=True)
         ws.merge_cells('A1:D1')
 
@@ -3496,7 +3554,7 @@ def generate_csv_export(proposal):
 
     # Schüler pro Klasse
     for class_data in proposal['classes']:
-        class_name = f"5{chr(96 + class_data['number'])}"
+        class_name = _class_label(class_data)
         for student in sorted(class_data['students'], key=lambda s: (s['lastname'], s['firstname'])):
             schulform = student.get('schulform', '')
             is_ib = 'Ja' if schulform == 'IB' else ''
@@ -3558,10 +3616,10 @@ def generate_pdf_export(proposal):
 
     # Pro Klasse eine Seite
     for idx, class_data in enumerate(proposal['classes']):
-        class_name = f"5{chr(96 + class_data['number'])}"
+        class_name = _class_label(class_data)
 
         # Titel
-        elements.append(Paragraph(f"Klasse {class_name}", title_style))
+        elements.append(Paragraph(class_name, title_style))
 
         # Statistiken
         stats_data = [

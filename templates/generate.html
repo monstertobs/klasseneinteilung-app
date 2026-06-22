@@ -281,10 +281,10 @@
             {% for class in proposal.classes %}
             <div class="class-card"
                  data-class-id="{{ loop.index0 }}"
-                 data-class-name="5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}">
+                 data-class-name="{{ class.name or ('5' ~ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1]) }}">
                 <div class="class-header">
                     <h4>
-                        Klasse 5{{ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1] }}
+                        {{ class.name or ('5' ~ 'abcdefghijklmnopqrstuvwxyz'[class.number - 1]) }}
                         {% if class.is_sportklasse %} <span style="color: #28a745; font-size: 0.8em;">(Sportklasse)</span>{% endif %}
                         {% if class.special_type == 'sport' %} <span style="font-size: 0.8em;">&#9917;</span>{% endif %}
                         {% if class.special_type == 'custom' %} <span style="font-size: 0.8em; color: #6c757d;">({{ class.custom_name }})</span>{% endif %}
