@@ -16,6 +16,39 @@
     </div>
 </div>
 
+{# --- Wunsch-Erfüllungs-Übersicht --- #}
+{% if wish_summary %}
+<div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
+    <div style="font-size: 1.05rem;">
+        <strong>Wunsch-Erf&uuml;llung:</strong>
+        {% if wish_summary.total %}
+        <span style="color: #15803d; font-weight: 700;">{{ wish_summary.rate }}%</span>
+        &mdash; {{ wish_summary.fulfilled }} von {{ wish_summary.total }} W&uuml;nschen erf&uuml;llt{% if wish_summary.unfulfilled_count %},
+        <span style="color: #b91c1c; font-weight: 600;">{{ wish_summary.unfulfilled_count }} offen</span>{% endif %}.
+        {% else %}
+        Keine Elternw&uuml;nsche erfasst.
+        {% endif %}
+    </div>
+    {% if wish_summary.unfulfilled %}
+    <details open style="margin-top: 0.75rem;">
+        <summary style="cursor: pointer; font-weight: 600; color: #b91c1c;">Nicht erf&uuml;llte W&uuml;nsche ({{ wish_summary.unfulfilled_count }})</summary>
+        <ul style="margin: 0.6rem 0 0 0; padding-left: 1.2rem; columns: 2; column-gap: 2rem;">
+            {% for u in wish_summary.unfulfilled %}
+            <li style="font-size: 0.85rem; margin-bottom: 0.3rem; break-inside: avoid;">
+                <span style="color: #b91c1c;">&#10007;</span>
+                {{ u.student }}
+                {% if u.type == 'together' %}<em>nicht zusammen mit</em>{% else %}<em>nicht getrennt von</em>{% endif %}
+                {{ u.related }}
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% elif wish_summary.total %}
+    <div style="margin-top: 0.5rem; color: #15803d; font-weight: 600;">&#10003; Alle W&uuml;nsche erf&uuml;llt!</div>
+    {% endif %}
+</div>
+{% endif %}
+
 {# --- Legende --- #}
 <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
     <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); margin-right: 0.5rem;">Legende:</span>

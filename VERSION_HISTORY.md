@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.64 - Wunsch-Erfüllungs-Übersicht in der Transparenz
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature (Wunsch Schulleitungsteam)
+- **Wunsch-Übersicht auf der Transparenzseite:** Oben auf der Transparenzseite (für Vorschläge und gespeicherte Einteilungen) steht jetzt die Wunsch-Erfüllungsquote (z.B. „82 % — 143 von 175 Wünschen erfüllt, 32 offen") plus eine ausklappbare **Liste aller nicht erfüllten Wünsche** (wer nicht mit/nicht getrennt von wem). Sind alle erfüllt: „✓ Alle Wünsche erfüllt!".
+- Neue Funktion `compute_wish_summary()`; Wünsche werden als eindeutige Paare gezählt (keine Doppelungen). Die per-Schüler-✓/✗-Anzeige gab es bereits.
+
+---
+
 ## Version 0.1.63 - Klickbare Wohnorte auch in der Vorschau
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

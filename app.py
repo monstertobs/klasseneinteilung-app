@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.63
+Version: 0.1.64
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.63'
+__version__ = '0.1.64'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -3963,6 +3963,46 @@ def compute_transparency(proposal, wishes):
     return proposal
 
 
+def compute_wish_summary(proposal, wishes):
+    """Übersicht der Wunsch-Erfüllung: Quote + Liste der NICHT erfüllten Wünsche.
+    Wünsche werden als ungeordnete Paare (A↔B) je Typ gezählt, um Doppelungen zu vermeiden."""
+    cls_of = {}
+    name_of = {}
+    for ci, cls in enumerate(proposal['classes']):
+        for s in cls['students']:
+            cls_of[s['id']] = ci
+            name_of[s['id']] = f"{s.get('lastname', '')}, {s.get('firstname', '')}".strip().strip(',').strip()
+
+    pairs = {}  # (min_id, max_id, typ) -> (sid, rid, typ)
+    for wish in wishes:
+        w = dict(wish)
+        sid, rid, wt = w['student_id'], w.get('related_student_id'), w['wish_type']
+        # nur Wünsche zählen, bei denen beide Schüler in dieser Einteilung sind
+        if not rid or sid not in cls_of or rid not in cls_of:
+            continue
+        key = (min(sid, rid), max(sid, rid), wt)
+        pairs.setdefault(key, (sid, rid, wt))
+
+    fulfilled = 0
+    unfulfilled = []
+    for sid, rid, wt in pairs.values():
+        same = cls_of[sid] == cls_of[rid]
+        ok = (wt == 'together' and same) or (wt == 'separated' and not same)
+        if ok:
+            fulfilled += 1
+        else:
+            unfulfilled.append({'student': name_of[sid], 'related': name_of[rid], 'type': wt})
+    unfulfilled.sort(key=lambda u: u['student'])
+    total = len(pairs)
+    return {
+        'total': total,
+        'fulfilled': fulfilled,
+        'unfulfilled_count': total - fulfilled,
+        'rate': round(fulfilled / total * 100) if total else None,
+        'unfulfilled': unfulfilled,
+    }
+
+
 @app.route('/generate/transparency/<int:proposal_idx>')
 @login_required
 def generate_transparency(proposal_idx):
@@ -3979,10 +4019,12 @@ def generate_transparency(proposal_idx):
     db.close()
 
     proposal = compute_transparency(proposals[proposal_idx], wishes)
+    wish_summary = compute_wish_summary(proposal, wishes)
 
     return render_template('transparency.html',
                            proposal=proposal,
                            proposal_idx=proposal_idx,
+                           wish_summary=wish_summary,
                            source='generate')
 
 
@@ -4009,10 +4051,12 @@ def assignment_transparency(assignment_id):
     db.close()
 
     proposal = compute_transparency(proposal, wishes)
+    wish_summary = compute_wish_summary(proposal, wishes)
 
     return render_template('transparency.html',
                            proposal=proposal,
                            assignment=assignment,
+                           wish_summary=wish_summary,
                            source='saved')
 
 
