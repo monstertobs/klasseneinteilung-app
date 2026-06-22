@@ -6,6 +6,16 @@
 
 ---
 
+## Version 0.1.63 - Klickbare Wohnorte auch in der Vorschau
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Erweiterung
+- Die klickbaren Wohnort-Chips (aus v0.1.62) gibt es jetzt **auch in der Generieren-Vorschau** (alle 3 Vorschläge), nicht nur in der gespeicherten Einteilung. Klick auf einen Ort hebt die Schüler aus diesem Ort in der jeweiligen Klasse hervor — pro Vorschlag/Klasse getrennt.
+
+---
+
 ## Version 0.1.62 - Klickbare Wohnorte in gespeicherter Einteilung
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

@@ -328,7 +328,8 @@
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
                         {% for city, count in class.city_count.items()|sort %}
-                        <span style="display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);">
+                        <span class="city-chip" data-city="{{ city }}" onclick="toggleCityHighlight(this)" title="Klicken: Schüler aus diesem Ort hervorheben"
+                              style="display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2); cursor: pointer; user-select: none;">
                             {{ city }}
                             {% if count > 1 %}
                             <span style="margin-left: 0.3rem; padding: 0.1rem 0.4rem; background: rgba(255, 255, 255, 0.3); border-radius: 8px; font-size: 0.7rem; font-weight: 600;">{{ count }}</span>
@@ -348,6 +349,7 @@
                          data-gender="{{ student.gender or '' }}"
                          data-schulform="{{ student.schulform or '' }}"
                          data-wohnort="{{ student.wohnort or '' }}"
+                         data-city="{{ student.wohnort|extract_city or '' }}"
                          data-religion="{{ student.religion or '' }}"
                          data-sport-interesse="{{ '1' if student.sport_interesse else '0' }}"
                          data-ikl="{{ '1' if student.ikl else '0' }}"
@@ -548,6 +550,11 @@
 </script>
 
 <style>
+/* ── Klickbare Wohnorte ────────────────────────────────────────── */
+.city-chip.city-active { background: #007aff !important; box-shadow: 0 0 0 2px #0050b3 !important; }
+.student-item.city-match { background: #fff3cd !important; box-shadow: inset 3px 0 0 #ffc107; }
+.student-item.city-dim { opacity: 0.35; }
+
 /* ── Vergleichs-Panel ──────────────────────────────────────────── */
 .comparison-panel {
     background: white;
@@ -661,4 +668,21 @@
 .stat-red { color: #b91c1c; }
 </style>
 <script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
+<script>
+// Klick auf einen Wohnort-Chip: Schüler aus diesem Ort in derselben Klasse hervorheben
+function toggleCityHighlight(chip) {
+    const card = chip.closest('.class-card');
+    if (!card) return;
+    const city = chip.getAttribute('data-city');
+    const wasActive = chip.classList.contains('city-active');
+    card.querySelectorAll('.city-chip').forEach(c => c.classList.remove('city-active'));
+    card.querySelectorAll('.student-item').forEach(s => s.classList.remove('city-match', 'city-dim'));
+    if (wasActive) return;
+    chip.classList.add('city-active');
+    card.querySelectorAll('.student-item').forEach(function (s) {
+        if (s.getAttribute('data-city') === city) s.classList.add('city-match');
+        else s.classList.add('city-dim');
+    });
+}
+</script>
 {% endblock %}
