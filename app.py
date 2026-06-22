@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.60
+Version: 0.1.61
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.60'
+__version__ = '0.1.61'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -3304,6 +3304,26 @@ def update_assignment(assignment_id):
         cls['ib_count'] = sum(1 for s in new_students if s.get('schulform') == 'IB')
         cls['sport_count'] = sum(1 for s in new_students if s.get('sportlich'))
         cls['inklusion_count'] = sum(1 for s in new_students if s.get('special_needs'))
+
+        # Religions-Zähler neu berechnen
+        cls['religion_count'] = {'ethik': 0, 'katholisch': 0, 'evangelisch': 0, '': 0}
+        for s in new_students:
+            rel = s.get('religion', '') or ''
+            if rel in cls['religion_count']:
+                cls['religion_count'][rel] += 1
+
+        # Wohnort-/Städte-Zähler neu berechnen (sonst veraltete Anzeige nach Verschieben)
+        cls['wohnort_count'] = {}
+        city_count = {}
+        for s in new_students:
+            wohnort = (s.get('wohnort') or '').strip()
+            if not wohnort:
+                continue
+            cls['wohnort_count'][wohnort] = cls['wohnort_count'].get(wohnort, 0) + 1
+            city = extract_city_from_wohnort(wohnort)
+            if city:
+                city_count[city] = city_count.get(city, 0) + 1
+        cls['city_count'] = city_count
 
     db.execute('UPDATE class_assignments SET data = ? WHERE id = ?',
                (json.dumps(proposal), assignment_id))

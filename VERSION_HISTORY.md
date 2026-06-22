@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.61 - Bugfix: Wohnort-/Religions-Anzeige nach Verschieben
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Bugfix
+- **Nach Drag-&-Drop-Verschiebung + Speichern** wurden die Wohnort-/Städte-Zähler (und auch die Religions-Zähler) einer Klasse nicht neu berechnet → die „Wohnorte"-Anzeige zeigte veraltete Werte. `update_assignment` berechnet jetzt `city_count`, `wohnort_count` und `religion_count` aus der neuen Klassenzusammensetzung neu (Geschlecht/Schulform/IB/Sport/Inklusion waren bereits korrekt).
+- Verifiziert: Verschieben eines Schülers korrigiert die Städte-Zähler exakt (z.B. „60438 Frankfurt am Main" 7 → 6).
+
+---
+
 ## Version 0.1.60 - Alphabetische Listen + Klassennamen änderbar
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
