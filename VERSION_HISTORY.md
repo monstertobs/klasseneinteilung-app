@@ -6,6 +6,21 @@
 
 ---
 
+## Version 0.1.59 - Wunsch-Zuordnung bei mehreren Nachnamen
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Verbesserung (Hinweis Schulleitungsteam)
+- **Freundschaftswünsche werden jetzt auch bei mehreren Nachnamen zugeordnet.** Bisher musste der komplette Nachname im Wunsch stehen; bei Doppelnamen (z.B. Schüler „Yilmaz Güney Küpeli") oder wenn im Wunsch nur ein Teil des Nachnamens stand, schlug die Zuordnung fehl.
+- Neue Regel: Ein Schüler passt, wenn **mindestens ein Vorname- UND mindestens ein Nachname-Token** übereinstimmen (vorher: ganzer Nachname). Ranking: exakte Übereinstimmung > mehr passende Nachname-Tokens > größere Gesamt-Überlappung. Mehrdeutige Treffer werden weiterhin nicht geraten, sondern gemeldet.
+- Deckt jetzt mehrere Vornamen UND mehrere Nachnamen sowie beliebige Reihenfolge ab.
+
+### Verifiziert
+- Synthetische Doppelnamen-Tests 8/8 korrekt. An echter (vom Team bereinigter) Datei: 241 Wünsche verknüpft, nur 2 nicht gefunden, 0 mehrdeutig, keine Falsch-Treffer in der Stichprobe (u.a. „Yilmaz Küpeli"→„Yilmaz Güney Küpeli", „Jannik Lauerer"→„Jannik Tobias Louis Lauerer").
+
+---
+
 ## Version 0.1.58 - Sport-Zwang vs. Trennungswunsch + IB-Sport-Fix
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

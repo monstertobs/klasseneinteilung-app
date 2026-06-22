@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.58
+Version: 0.1.59
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.58'
+__version__ = '0.1.59'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -1012,8 +1012,11 @@ def _name_tokens(s):
 def _find_student_by_name(related_name, all_students):
     """Findet den zu einem frei eingegebenen Namen passenden Schüler.
 
-    Toleriert mehrere Vornamen und beliebige Reihenfolge. Anker ist der Nachname:
-    alle Nachname-Tokens müssen im Wunschnamen vorkommen, plus mindestens ein Vorname.
+    Toleriert mehrere Vor- UND Nachnamen sowie beliebige Reihenfolge. Ein Schüler passt,
+    wenn mindestens ein Vorname-Token UND mindestens ein Nachname-Token übereinstimmen
+    (so werden auch Schüler gefunden, bei denen im Wunsch nur ein Teil des Doppelnamens steht).
+    Ranking: exakte Übereinstimmung > mehr passende Nachname-Tokens > größere Gesamt-Überlappung.
+    Mehrere gleich gute Treffer → 'ambiguous' (wird nicht geraten).
     Gibt (student_id, status) zurück — status: 'ok', 'none' oder 'ambiguous'.
     """
     w = set(_name_tokens(related_name))
@@ -1024,19 +1027,21 @@ def _find_student_by_name(related_name, all_students):
         first, last = st['first_tokens'], st['last_tokens']
         if not first or not last:
             continue
-        # Nachname muss vollständig vorkommen UND mindestens ein Vorname muss übereinstimmen
-        if all(t in w for t in last) and any(t in w for t in first):
+        last_matched = sum(1 for t in set(last) if t in w)
+        first_matched = sum(1 for t in set(first) if t in w)
+        # mind. ein Vorname- UND ein Nachname-Token müssen übereinstimmen
+        if last_matched and first_matched:
             exact = 1 if w == st['all_tokens'] else 0
             overlap = len(w & st['all_tokens'])
-            candidates.append((exact, overlap, st['id']))
+            candidates.append((exact, last_matched, overlap, st['id']))
     if not candidates:
         return None, 'none'
     candidates.sort(reverse=True)
     best = candidates[0]
     # Mehrdeutig, wenn mehrere Schüler gleich gut passen → nicht raten
-    if sum(1 for c in candidates if c[0] == best[0] and c[1] == best[1]) > 1:
+    if sum(1 for c in candidates if c[:3] == best[:3]) > 1:
         return None, 'ambiguous'
-    return best[2], 'ok'
+    return best[3], 'ok'
 
 
 def process_import_data(data, batch_id):
