@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.62 - Klickbare Wohnorte in gespeicherter Einteilung
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature (Wunsch Schulleitungsteam)
+- **Wohnort-Chips anklickbar:** In der gespeicherten Einteilung kann man in der „📍 Wohnorte"-Liste einer Klasse auf einen Ort klicken — die Schüler aus diesem Ort werden hervorgehoben (gelb), die übrigen ausgegraut. Erneuter Klick hebt die Markierung auf. Hilft beim manuellen Verschieben. Funktioniert auch im Bearbeitungsmodus.
+- Technisch: neuer Jinja-Filter `extract_city`, `data-city` je Schüler, JS `toggleCityHighlight()`.
+
+---
+
 ## Version 0.1.61 - Bugfix: Wohnort-/Religions-Anzeige nach Verschieben
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

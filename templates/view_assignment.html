@@ -107,7 +107,8 @@
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
                         {% for city, count in class.city_count.items()|sort(attribute='1', reverse=True) %}
-                        <span style="background: #f5f5f7; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; color: #1d1d1f;">
+                        <span class="city-chip" data-city="{{ city }}" onclick="toggleCityHighlight(this)" title="Klicken: Schüler aus diesem Ort hervorheben"
+                              style="background: #f5f5f7; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; color: #1d1d1f; cursor: pointer; user-select: none;">
                             {{ city }} <strong style="color: #007aff;">({{ count }})</strong>
                         </span>
                         {% endfor %}
@@ -123,6 +124,7 @@
                          data-gender="{{ student.gender or '' }}"
                          data-schulform="{{ student.schulform or '' }}"
                          data-wohnort="{{ student.wohnort or '' }}"
+                         data-city="{{ student.wohnort|extract_city or '' }}"
                          data-religion="{{ student.religion or '' }}"
                          data-sport-interesse="{{ '1' if student.sport_interesse else '0' }}"
                          data-ikl="{{ '1' if student.ikl else '0' }}"
@@ -209,9 +211,32 @@
     </div>
 </div>
 
+<style>
+.city-chip.city-active { background: #007aff !important; color: #fff !important; }
+.city-chip.city-active strong { color: #fff !important; }
+.student-item.city-match { background: #fff3cd !important; box-shadow: inset 3px 0 0 #ffc107; }
+.student-item.city-dim { opacity: 0.35; }
+</style>
 <script src="{{ url_for('static', filename='js/drag-drop.js') }}"></script>
 <script>
 let editModeActive = false;
+
+// Klick auf einen Wohnort-Chip: Schüler aus diesem Ort in derselben Klasse hervorheben
+function toggleCityHighlight(chip) {
+    const card = chip.closest('.class-card');
+    if (!card) return;
+    const city = chip.getAttribute('data-city');
+    const wasActive = chip.classList.contains('city-active');
+    // Erst alles in dieser Klasse zurücksetzen
+    card.querySelectorAll('.city-chip').forEach(c => c.classList.remove('city-active'));
+    card.querySelectorAll('.student-item').forEach(s => s.classList.remove('city-match', 'city-dim'));
+    if (wasActive) return;  // war aktiv → nur ausschalten
+    chip.classList.add('city-active');
+    card.querySelectorAll('.student-item').forEach(function (s) {
+        if (s.getAttribute('data-city') === city) s.classList.add('city-match');
+        else s.classList.add('city-dim');
+    });
+}
 
 function toggleEditMode() {
     editModeActive = !editModeActive;

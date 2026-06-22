@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.61
+Version: 0.1.62
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.61'
+__version__ = '0.1.62'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2076,6 +2076,9 @@ def extract_city_from_wohnort(wohnort):
         stadt = re.sub(r'\s*\([^)]*\)', '', stadt).strip()
         return f"{plz} {stadt}"
     return None
+
+# Als Jinja-Filter verfügbar machen (für klickbare Wohnort-Anzeige in den Templates)
+app.jinja_env.filters['extract_city'] = extract_city_from_wohnort
 
 def extract_plz_from_wohnort(wohnort):
     """Extrahiere nur die PLZ aus vollständiger Adresse"""
