@@ -6,6 +6,21 @@
 
 ---
 
+## Version 0.1.58 - Sport-Zwang vs. Trennungswunsch + IB-Sport-Fix
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Bugfixes (Sport-Schüler landeten in Normalklassen)
+Aufgefallen am Fall "Angelo Piccininni" (Sport-Häkchen, aber in Normalklasse). Zwei Ursachen:
+- **Trennungswunsch überstimmte den Sportklassen-Zwang:** Hatte ein Sport-Schüler einen "Auf keinen Fall mit"-Wunsch gegen Schüler, die beide Sportklassen belegten, drückte der Trennungswunsch (−5000) ihn in eine Normalklasse. Jetzt ist der Sportklassen-Zwang (−8000 für Sport-Schüler in Normalklasse) stärker als der Trennungswunsch, aber schwächer als die Klassengrößen-Sperre (−10000) → kein Überlauf. Der Trennungswunsch wird weiterhin INNERHALB der Sportklassen bestmöglich beachtet.
+- **IB-Vorverteilung ignorierte Sport:** IB-Schüler mit Sport-Häkchen wurden teils in Normalklassen vorverteilt. Jetzt werden IB-Sport-Schüler über die normale Platzierung in Sportklassen gebracht; die IB-Vorverteilung legt Nicht-Sport-IB ausschließlich in Nicht-Sport-Klassen. Ohne konfigurierte Sportklassen bleibt die IB-Vorverteilung unverändert (keine Einzelkämpfer).
+
+### Verifiziert
+- Echte Datei (45 Sport-Häkchen, 6 IB): 12 Läufe (3 Konfigurationen × 4 Seeds) → 0 Verletzungen der Sport-Invariante; Angelo, Elias und Mustafa korrekt in Sportklassen.
+
+---
+
 ## Version 0.1.57 - Wunsch-Garantie + neue Prioritäten (Schulleitung)
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

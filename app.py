@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.57
+Version: 0.1.58
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.57'
+__version__ = '0.1.58'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -2474,27 +2474,32 @@ def generate_class_assignment(students, wishes, num_classes, seed, options, base
     if options.get('ib_min', 0) > 0 and options.get('ib_max', 0) > 0:
         ib_min = options.get('ib_min', 0)
         ib_max = options.get('ib_max', 0)
-        ib_students_pre = [s for s in student_list if s.get('schulform') == 'IB']
-        student_list = [s for s in student_list if s.get('schulform') != 'IB']
+        sport_class_indices = {ci for ci, t in specialized_mapping.items() if t == 'sport'}
+        has_sport = bool(sport_class_indices)
+
+        # Wenn Sportklassen existieren: IB-Schüler MIT Sportklassen-Häkchen NICHT vorverteilen —
+        # sie müssen in eine Sportklasse und werden über die normale Platzierung (Sport-Zwang)
+        # korrekt zugeordnet. Ohne Sportklassen werden alle IB-Schüler normal vorverteilt.
+        def _is_pre_ib(s):
+            return s.get('schulform') == 'IB' and not (has_sport and s.get('sport_interesse'))
+        ib_students_pre = [s for s in student_list if _is_pre_ib(s)]
+        student_list = [s for s in student_list if not _is_pre_ib(s)]
         random.shuffle(ib_students_pre)
 
         num_ib = len(ib_students_pre)
-        num_ib_classes = min(num_classes, num_ib // ib_min) if ib_min > 0 else num_classes
 
-        sport_class_indices = {ci for ci, t in specialized_mapping.items() if t == 'sport'}
+        # Nicht-Sport-IB ausschließlich auf Nicht-Sport-Klassen verteilen
+        eligible = [ci for ci in range(num_classes) if ci not in sport_class_indices]
+        if not eligible:
+            eligible = list(range(num_classes))
+        num_ib_classes = min(len(eligible), num_ib // ib_min) if ib_min > 0 else len(eligible)
 
         if num_ib_classes > 0:
             for idx, student in enumerate(ib_students_pre):
-                target_class = idx % num_ib_classes
-                # IB ohne Sportklassen-Hacken nicht in Sportklassen einteilen
-                if not student.get('sport_interesse') and target_class in sport_class_indices:
-                    for alt in range(num_ib_classes):
-                        if alt not in sport_class_indices and (ib_max == 0 or ib_count[alt] < ib_max):
-                            target_class = alt
-                            break
-                # Falls Maximum erreicht, nächste Klasse mit Platz suchen
+                target_class = eligible[idx % num_ib_classes]
+                # Falls Maximum erreicht, nächste geeignete Klasse mit Platz suchen
                 if ib_count[target_class] >= ib_max:
-                    for alt in range(num_ib_classes):
+                    for alt in eligible:
                         if ib_count[alt] < ib_max:
                             target_class = alt
                             break
@@ -2709,9 +2714,12 @@ def find_best_class(student, classes, gender_count, wohnort_count, city_count, p
                     score -= 5000  # Harte Sperre: kein Sportklassen-Hacken → nie in Sportklasse
 
         # Wenn Schüler Sport-Interesse hat aber nicht in Sport-Spezialklasse
-        if student.get('sport_interesse'):
+        if student.get('sport_interesse') and specialized_mapping:
             if specialized_mapping.get(i) != 'sport':
-                score -= 200  # Starke Strafe: Sport-Schüler sollen nicht in Normal-Klassen
+                # Sportklasse ist zwingend (Schulleitung): Diese Sperre muss stärker sein als ein
+                # Trennungswunsch (-5000), aber schwächer als die volle-Klasse-Sperre (-10000),
+                # damit kein Überlauf über die Kapazität entsteht.
+                score -= 8000
 
         # Sportklasse (backward compatibility): Klasse 1 (Index 0) für sportliche Schüler
         if options.get('sportklasse', False):
