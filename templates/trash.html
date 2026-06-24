@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Papierkorb — Klasseneinteilung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>🗑 Papierkorb</h2>
+        <p>Gelöschte Einteilungen werden 30 Tage aufbewahrt und können wiederhergestellt werden.</p>
+    </div>
+    <a href="{{ url_for('assignments') }}" class="btn btn-secondary">Zur&uuml;ck zu den Einteilungen</a>
+</div>
+
+{% if assignments %}
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th class="hide-mobile">Erstellt am</th>
+                <th class="hide-mobile">Gelöscht am</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in assignments %}
+            <tr>
+                <td><strong>{{ a.name }}</strong></td>
+                <td class="hide-mobile">{{ a.created_at }}</td>
+                <td class="hide-mobile">{{ a.deleted_at }}</td>
+                <td style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <form method="POST" action="{{ url_for('restore_assignment', assignment_id=a.id) }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-primary btn-sm">Wiederherstellen</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('purge_assignment', assignment_id=a.id) }}" style="display:inline;"
+                          onsubmit="return confirm('Diese Einteilung ENDGÜLTIG löschen? Das kann nicht rückgängig gemacht werden.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger btn-sm">Endg&uuml;ltig l&ouml;schen</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>Papierkorb ist leer</h3>
+    <p>Gelöschte Einteilungen erscheinen hier und können wiederhergestellt werden.</p>
+</div>
+{% endif %}
+{% endblock %}

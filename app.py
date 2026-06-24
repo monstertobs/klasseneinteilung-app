@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.64
+Version: 0.1.65
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.64'
+__version__ = '0.1.65'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -370,6 +370,24 @@ def init_user_db(user_id):
         )
     ''')
     cursor.execute('INSERT OR IGNORE INTO school_config (id) VALUES (1)')
+
+    # Migration: Papierkorb-Spalte (Soft-Delete) für class_assignments
+    try:
+        cursor.execute('ALTER TABLE class_assignments ADD COLUMN deleted_at TIMESTAMP')
+    except Exception:
+        pass  # Spalte existiert bereits
+
+    # Versions-Historie (automatische Snapshots vor jeder Änderung)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS class_assignment_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            assignment_id INTEGER NOT NULL,
+            name TEXT,
+            data TEXT NOT NULL,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
 
     db.commit()
     db.close()
@@ -746,7 +764,7 @@ def dashboard():
     wish_separated = cursor.fetchone()['count']
 
     # Einteilungen
-    cursor.execute('SELECT COUNT(*) as count FROM class_assignments')
+    cursor.execute('SELECT COUNT(*) as count FROM class_assignments WHERE deleted_at IS NULL')
     assignment_count = cursor.fetchone()['count']
 
     # Wunsch-Erfüllungsrate aus neuester Einteilung berechnen
@@ -755,7 +773,7 @@ def dashboard():
     wish_total = 0
     latest_assignment_name = None
 
-    cursor.execute('SELECT name, data FROM class_assignments ORDER BY created_at DESC LIMIT 1')
+    cursor.execute('SELECT name, data FROM class_assignments WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 1')
     latest = cursor.fetchone()
     if latest and wish_count > 0:
         latest_assignment_name = latest['name']
@@ -1842,7 +1860,7 @@ def generate():
     wishes = cursor.fetchall()
 
     # Gespeicherte Einteilungen für Basis-Auswahl laden
-    cursor.execute('SELECT id, name, created_at FROM class_assignments ORDER BY created_at DESC')
+    cursor.execute('SELECT id, name, created_at FROM class_assignments WHERE deleted_at IS NULL ORDER BY created_at DESC')
     existing_assignments = cursor.fetchall()
 
     db.close()
@@ -3148,7 +3166,7 @@ def assignments():
     """Gespeicherte Einteilungen anzeigen"""
     db = get_db()
     cursor = db.cursor()
-    cursor.execute('SELECT * FROM class_assignments ORDER BY created_at DESC')
+    cursor.execute('SELECT * FROM class_assignments WHERE deleted_at IS NULL ORDER BY created_at DESC')
     assignments = cursor.fetchall()
     db.close()
 
@@ -3213,10 +3231,35 @@ def compare_assignments():
                            changed_count=changed_count,
                            total_count=len(rows))
 
+def _snapshot_assignment(db, assignment_id, reason, max_versions=20):
+    """Sichert den AKTUELLEN Stand einer Einteilung als Version (vor einer Änderung).
+    Behält je Einteilung nur die letzten max_versions Snapshots."""
+    row = db.execute('SELECT name, data FROM class_assignments WHERE id = ?', (assignment_id,)).fetchone()
+    if not row:
+        return
+    db.execute('INSERT INTO class_assignment_versions (assignment_id, name, data, reason) VALUES (?, ?, ?, ?)',
+               (assignment_id, row['name'], row['data'], reason))
+    db.execute('''DELETE FROM class_assignment_versions
+                  WHERE assignment_id = ? AND id NOT IN (
+                      SELECT id FROM class_assignment_versions
+                      WHERE assignment_id = ? ORDER BY id DESC LIMIT ?)''',
+               (assignment_id, assignment_id, max_versions))
+
+
+def _purge_old_trash(db, days=30):
+    """Einträge, die länger als `days` Tage im Papierkorb liegen, endgültig entfernen."""
+    old = [r['id'] for r in db.execute(
+        "SELECT id FROM class_assignments WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', ?)",
+        (f'-{days} days',)).fetchall()]
+    for aid in old:
+        db.execute('DELETE FROM class_assignment_versions WHERE assignment_id = ?', (aid,))
+        db.execute('DELETE FROM class_assignments WHERE id = ?', (aid,))
+
+
 @app.route('/assignments/<int:assignment_id>/delete', methods=['POST'])
 @login_required
 def delete_assignment(assignment_id):
-    """Gespeicherte Einteilung löschen"""
+    """Gespeicherte Einteilung in den Papierkorb verschieben (Soft-Delete)."""
     db = get_db()
     cursor = db.cursor()
     cursor.execute('SELECT id FROM class_assignments WHERE id = ?', (assignment_id,))
@@ -3224,11 +3267,93 @@ def delete_assignment(assignment_id):
         db.close()
         flash('Einteilung nicht gefunden.', 'danger')
         return redirect(url_for('assignments'))
+    cursor.execute('UPDATE class_assignments SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', (assignment_id,))
+    db.commit()
+    db.close()
+    flash('Einteilung in den Papierkorb verschoben. Sie kann dort 30 Tage lang wiederhergestellt werden.', 'success')
+    return redirect(url_for('assignments'))
+
+
+@app.route('/assignments/trash')
+@login_required
+def assignments_trash():
+    """Papierkorb: gelöschte Einteilungen anzeigen (wiederherstellbar)."""
+    db = get_db()
+    _purge_old_trash(db)
+    db.commit()
+    rows = db.execute(
+        'SELECT id, name, created_at, deleted_at FROM class_assignments '
+        'WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC').fetchall()
+    db.close()
+    return render_template('trash.html', assignments=rows)
+
+
+@app.route('/assignments/<int:assignment_id>/restore', methods=['POST'])
+@login_required
+def restore_assignment(assignment_id):
+    """Einteilung aus dem Papierkorb wiederherstellen."""
+    db = get_db()
+    db.execute('UPDATE class_assignments SET deleted_at = NULL WHERE id = ?', (assignment_id,))
+    db.commit()
+    db.close()
+    flash('Einteilung wiederhergestellt.', 'success')
+    return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
+
+@app.route('/assignments/<int:assignment_id>/purge', methods=['POST'])
+@login_required
+def purge_assignment(assignment_id):
+    """Einteilung endgültig löschen (nur aus dem Papierkorb)."""
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('SELECT deleted_at FROM class_assignments WHERE id = ?', (assignment_id,))
+    row = cursor.fetchone()
+    if not row or row['deleted_at'] is None:
+        db.close()
+        flash('Nur Einteilungen aus dem Papierkorb können endgültig gelöscht werden.', 'warning')
+        return redirect(url_for('assignments_trash'))
+    cursor.execute('DELETE FROM class_assignment_versions WHERE assignment_id = ?', (assignment_id,))
     cursor.execute('DELETE FROM class_assignments WHERE id = ?', (assignment_id,))
     db.commit()
     db.close()
-    flash('Einteilung wurde gelöscht.', 'success')
-    return redirect(url_for('assignments'))
+    flash('Einteilung endgültig gelöscht.', 'info')
+    return redirect(url_for('assignments_trash'))
+
+@app.route('/assignments/<int:assignment_id>/versions')
+@login_required
+def assignment_versions(assignment_id):
+    """Liste der automatischen Versions-Snapshots einer Einteilung."""
+    db = get_db()
+    a = db.execute('SELECT id, name FROM class_assignments WHERE id = ?', (assignment_id,)).fetchone()
+    if not a:
+        db.close()
+        flash('Einteilung nicht gefunden.', 'danger')
+        return redirect(url_for('assignments'))
+    versions = db.execute(
+        'SELECT id, reason, created_at FROM class_assignment_versions '
+        'WHERE assignment_id = ? ORDER BY id DESC', (assignment_id,)).fetchall()
+    db.close()
+    return render_template('versions.html', assignment=a, versions=versions)
+
+
+@app.route('/assignments/<int:assignment_id>/versions/<int:version_id>/restore', methods=['POST'])
+@login_required
+def restore_version(assignment_id, version_id):
+    """Eine frühere Version wiederherstellen (aktueller Stand wird vorher gesichert)."""
+    db = get_db()
+    v = db.execute('SELECT data FROM class_assignment_versions WHERE id = ? AND assignment_id = ?',
+                   (version_id, assignment_id)).fetchone()
+    if not v:
+        db.close()
+        flash('Version nicht gefunden.', 'danger')
+        return redirect(url_for('assignment_versions', assignment_id=assignment_id))
+    _snapshot_assignment(db, assignment_id, 'Vor Wiederherstellung einer Version')
+    db.execute('UPDATE class_assignments SET data = ? WHERE id = ?', (v['data'], assignment_id))
+    db.commit()
+    db.close()
+    flash('Frühere Version wiederhergestellt.', 'success')
+    return redirect(url_for('view_assignment', assignment_id=assignment_id))
+
 
 @app.route('/assignments/<int:assignment_id>')
 @login_required
@@ -3328,6 +3453,7 @@ def update_assignment(assignment_id):
                 city_count[city] = city_count.get(city, 0) + 1
         cls['city_count'] = city_count
 
+    _snapshot_assignment(db, assignment_id, 'Vor Verschieben (Drag & Drop)')
     db.execute('UPDATE class_assignments SET data = ? WHERE id = ?',
                (json.dumps(proposal), assignment_id))
     db.commit()
@@ -3361,6 +3487,7 @@ def rename_classes(assignment_id):
                 changed += 1
 
     if changed:
+        _snapshot_assignment(db, assignment_id, 'Vor Umbenennen')
         db.execute('UPDATE class_assignments SET data = ? WHERE id = ?',
                    (json.dumps(proposal), assignment_id))
         db.commit()

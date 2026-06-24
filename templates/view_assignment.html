@@ -188,6 +188,7 @@
 
         <div class="proposal-actions" style="margin-top: 2rem;">
             <a href="{{ url_for('assignment_transparency', assignment_id=assignment.id) }}" class="btn btn-secondary">Transparenz</a>
+            <a href="{{ url_for('assignment_versions', assignment_id=assignment.id) }}" class="btn btn-secondary">Versionen</a>
             <div class="export-container" style="position: relative; display: inline-block;">
                 <button type="button" class="btn btn-secondary" onclick="toggleExportMenu(0)">
                     Export

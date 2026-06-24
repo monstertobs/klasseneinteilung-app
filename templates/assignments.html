@@ -8,7 +8,10 @@
         <h2>Gespeicherte Einteilungen</h2>
         <p>{{ assignments|length }} Einteilungen gespeichert</p>
     </div>
-    <button id="compare-btn" class="btn btn-secondary" style="display:none;" onclick="compareSelected()">Vergleichen</button>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button id="compare-btn" class="btn btn-secondary" style="display:none;" onclick="compareSelected()">Vergleichen</button>
+        <a href="{{ url_for('assignments_trash') }}" class="btn btn-secondary">🗑 Papierkorb</a>
+    </div>
 </div>
 
 {% if assignments %}
@@ -36,7 +39,8 @@
                 <td class="hide-mobile">{{ assignment.created_at }}</td>
                 <td style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <a href="{{ url_for('view_assignment', assignment_id=assignment.id) }}" class="btn btn-primary btn-sm">Ansehen</a>
-                    <form method="POST" action="{{ url_for('delete_assignment', assignment_id=assignment.id) }}" style="display:inline;" onsubmit="return confirm('Einteilung wirklich löschen?');">
+                    <a href="{{ url_for('assignment_versions', assignment_id=assignment.id) }}" class="btn btn-secondary btn-sm">Versionen</a>
+                    <form method="POST" action="{{ url_for('delete_assignment', assignment_id=assignment.id) }}" style="display:inline;" onsubmit="return confirm('Einteilung in den Papierkorb verschieben? Sie kann dort 30 Tage wiederhergestellt werden.');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm">L&ouml;schen</button>
                     </form>

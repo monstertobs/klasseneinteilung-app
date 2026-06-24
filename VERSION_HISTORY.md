@@ -6,6 +6,23 @@
 
 ---
 
+## Version 0.1.65 - Papierkorb + automatische Versions-Snapshots
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neue Features (Datensicherung)
+- **Papierkorb (Soft-Delete):** Gelöschte Einteilungen werden nicht mehr sofort vernichtet, sondern landen 30 Tage im Papierkorb (`/assignments/trash`) und können wiederhergestellt werden. Endgültiges Löschen nur dort. Schützt vor versehentlichem Löschen.
+- **Automatische Versions-Snapshots:** Vor jeder Änderung (Verschieben per Drag & Drop, Umbenennen, Versions-Wiederherstellung) wird automatisch eine Vorversion gesichert. Über „Versionen" (in der Einteilung oder Liste) kann eine frühere Fassung wiederhergestellt werden. Die letzten 20 Versionen je Einteilung bleiben erhalten.
+
+### Technisch
+- Neue Spalte `class_assignments.deleted_at` (Migration) + Tabelle `class_assignment_versions`.
+- Neue Routen: `/assignments/trash`, `.../restore`, `.../purge`, `.../versions`, `.../versions/<vid>/restore`.
+- Listen (Einteilungen, Dashboard, Generieren-Basis) blenden Papierkorb-Einträge aus (`deleted_at IS NULL`).
+- Helfer `_snapshot_assignment()` und `_purge_old_trash()` (Auto-Bereinigung nach 30 Tagen).
+
+---
+
 ## Version 0.1.64 - Wunsch-Erfüllungs-Übersicht in der Transparenz
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

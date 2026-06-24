@@ -55,7 +55,7 @@
      • Großbuchstaben, Kleinbuchstaben, Ziffern
 
 
-  🔒 SICHERHEIT (v0.1.64 - KI-Assistent):
+  🔒 SICHERHEIT (v0.1.65 - KI-Assistent):
   ───────────────────────────────────────────────────────────────────────────
   ✓ Zufällig generiertes Initial-Passwort (16 Zeichen)
   ✓ Kryptographisch sichere Schlüssel (SECRET_KEY)
