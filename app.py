@@ -1,7 +1,7 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.65
+Version: 0.1.66
 Author: Tobias Meier <admin(at)secutobs.com>
 Date: 19. Juni 2026
 License: Proprietary - All rights reserved
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.65'
+__version__ = '0.1.66'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -324,6 +324,8 @@ def init_user_db(user_id):
         ('musik_interesse', 'INTEGER DEFAULT 0'),
         ('theater_interesse', 'INTEGER DEFAULT 0'),
         ('ikl', 'INTEGER DEFAULT 0'),
+        ('herkunft_schule', 'TEXT DEFAULT ""'),
+        ('herkunft_klasse', 'TEXT DEFAULT ""'),
     ]:
         try:
             cursor.execute(f'ALTER TABLE students ADD COLUMN {col} {coldef}')
@@ -908,7 +910,7 @@ def edit_student(student_id):
             db.close()
 
             flash(f'Schüler {firstname} {lastname} wurde aktualisiert.', 'success')
-            return redirect(url_for('students'))
+            return redirect(url_for('students', highlight=student_id, _anchor=f'student-{student_id}'))
         else:
             flash('Vorname und Nachname sind erforderlich.', 'danger')
 
@@ -1084,6 +1086,8 @@ def process_import_data(data, batch_id):
         'sport_interesse': ['sportklasse'],  # Sportklassen-Hacken = Schüler soll in Sportklasse
         # Hinweis: 'Sportattest' wird absichtlich ignoriert (nur Attests-Status, kein Einfluss auf Sportklasse)
         'special_needs': ['förderbedarf', 'foerderbedarf', 'special_needs', 'special needs', 'sonderpädagogik'],
+        'herkunft_schule': ['abgebendeschule', 'abgebende schule', 'grundschule', 'herkunftsschule', 'abgebende_schule'],
+        'herkunft_klasse': ['klassennamen', 'klassenname', 'grundschulklasse', 'herkunftsklasse', 'gs-klasse', 'klasse'],
         'notes': ['notizen', 'notes', 'bemerkungen', 'anmerkungen', 'infos übergabe', 'infos uebergabe', 'sonstige / einwände', 'sonstige / einwaende', 'sonstige']
     }
 
@@ -1179,6 +1183,8 @@ def process_import_data(data, batch_id):
                             student_data['special_needs'] = str(value).strip()
                             if sn_val not in known_sn:
                                 row_warnings.append(f'Förderbedarf "{str(value).strip()}" nicht erkannt — erwartet: hoerschaedigung / sprache / sozial_emotional / lernen / sehen / kme')
+                        elif db_field in ('herkunft_schule', 'herkunft_klasse'):
+                            student_data[db_field] = str(value).strip()
                         elif db_field == 'notes':
                             # Alle Notizen sammeln
                             notes_parts.append(f"{possible_name.title()}: {str(value).strip()}")
@@ -1260,8 +1266,8 @@ def process_import_data(data, batch_id):
 
             # In Datenbank einfügen (trotz Duplikat, wird später überprüft)
             cursor.execute('''
-                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, sport_interesse, special_needs, notes, import_batch_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO students (firstname, lastname, gender, wohnort, schulform, religion, sportlich, sport_interesse, special_needs, notes, herkunft_schule, herkunft_klasse, import_batch_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 firstname,
                 lastname,
@@ -1273,6 +1279,8 @@ def process_import_data(data, batch_id):
                 student_data.get('sport_interesse', 0),
                 student_data.get('special_needs', ''),
                 student_data.get('notes', ''),
+                student_data.get('herkunft_schule', ''),
+                student_data.get('herkunft_klasse', ''),
                 batch_id
             ))
 
@@ -1452,12 +1460,66 @@ def delete_duplicates():
         session.pop('last_import_batch', None)
         return redirect(url_for('students'))
 
+def _remove_students_from_assignments(db, student_ids):
+    """Entfernt gelöschte Schüler aus allen aktiven gespeicherten Einteilungen
+    (Papierkorb bleibt unangetastet) und berechnet die Klassen-Statistiken neu.
+    Vor jeder Änderung wird automatisch eine Version gesichert."""
+    import json
+    ids = {int(s) for s in student_ids}
+    if not ids:
+        return
+    rows = db.execute('SELECT id, data FROM class_assignments WHERE deleted_at IS NULL').fetchall()
+    for row in rows:
+        try:
+            proposal = json.loads(row['data'])
+        except Exception:
+            continue
+        changed = False
+        for cls in proposal.get('classes', []):
+            kept = [s for s in cls.get('students', []) if s.get('id') not in ids]
+            if len(kept) == len(cls.get('students', [])):
+                continue
+            changed = True
+            cls['students'] = kept
+            cls['count'] = len(kept)
+            cls['gender_count'] = {'m': sum(1 for s in kept if s.get('gender') == 'm'),
+                                   'w': sum(1 for s in kept if s.get('gender') == 'w')}
+            sf = {'H': 0, 'R': 0, 'G': 0, 'IB': 0, '': 0}
+            for s in kept:
+                k = s.get('schulform', '') or ''
+                if k in sf:
+                    sf[k] += 1
+            cls['schulform_count'] = sf
+            cls['ib_count'] = sf['IB']
+            rel = {'ethik': 0, 'katholisch': 0, 'evangelisch': 0, '': 0}
+            for s in kept:
+                k = s.get('religion', '') or ''
+                if k in rel:
+                    rel[k] += 1
+            cls['religion_count'] = rel
+            cls['sport_count'] = sum(1 for s in kept if s.get('sportlich'))
+            cls['inklusion_count'] = sum(1 for s in kept if s.get('special_needs'))
+            cc = {}
+            for s in kept:
+                c = extract_city_from_wohnort(s.get('wohnort', ''))
+                if c:
+                    cc[c] = cc.get(c, 0) + 1
+            cls['city_count'] = cc
+        if changed:
+            _snapshot_assignment(db, row['id'], 'Schüler gelöscht')
+            db.execute('UPDATE class_assignments SET data = ? WHERE id = ?',
+                       (json.dumps(proposal), row['id']))
+
+
 @app.route('/students/delete/<int:student_id>', methods=['POST'])
 @login_required
 def delete_student(student_id):
     """Schüler löschen"""
     db = get_db()
     cursor = db.cursor()
+
+    # Aus gespeicherten Einteilungen entfernen
+    _remove_students_from_assignments(db, [student_id])
 
     # Zuerst verbundene Elternwünsche löschen
     cursor.execute('DELETE FROM parent_wishes WHERE student_id = ? OR related_student_id = ?',
@@ -1468,7 +1530,7 @@ def delete_student(student_id):
     db.commit()
     db.close()
 
-    flash('Schüler wurde gelöscht.', 'success')
+    flash('Schüler wurde gelöscht (auch aus gespeicherten Einteilungen).', 'success')
     return redirect(url_for('students'))
 
 @app.route('/students/delete_multiple', methods=['POST'])
@@ -1484,6 +1546,9 @@ def delete_multiple_students():
     db = get_db()
     cursor = db.cursor()
 
+    # Aus gespeicherten Einteilungen entfernen
+    _remove_students_from_assignments(db, student_ids)
+
     count = 0
     for student_id in student_ids:
         # Zuerst verbundene Elternwünsche löschen
@@ -1497,7 +1562,7 @@ def delete_multiple_students():
     db.commit()
     db.close()
 
-    flash(f'{count} Schüler wurden gelöscht.', 'success')
+    flash(f'{count} Schüler wurden gelöscht (auch aus gespeicherten Einteilungen).', 'success')
     return redirect(url_for('students'))
 
 @app.route('/students/delete_all', methods=['POST'])
@@ -1514,6 +1579,10 @@ def delete_all_students():
     if count == 0:
         flash('Keine Schüler vorhanden.', 'info')
         return redirect(url_for('students'))
+
+    # Aus gespeicherten Einteilungen entfernen
+    all_ids = [r[0] for r in cursor.execute('SELECT id FROM students').fetchall()]
+    _remove_students_from_assignments(db, all_ids)
 
     # Zuerst alle Elternwünsche löschen
     cursor.execute('DELETE FROM parent_wishes')

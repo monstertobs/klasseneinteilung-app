@@ -40,7 +40,7 @@
         </thead>
         <tbody>
             {% for student in students %}
-            <tr {% if student.import_batch_id %}class="imported-student"{% endif %}>
+            <tr id="student-{{ student.id }}" {% if student.import_batch_id %}class="imported-student"{% endif %}>
                 <td>
                     <input type="checkbox" class="student-checkbox" data-student-id="{{ student.id }}" onchange="updateSelectedCount()">
                 </td>
@@ -461,5 +461,20 @@ document.addEventListener('keydown', function(e) {
     transition: opacity 0.2s;
 }
 .btn-testdata-submit:hover { opacity: 0.88; }
+@keyframes rowHighlight { 0% { background: #fff3cd; } 100% { background: transparent; } }
+tr.row-highlight > td { animation: rowHighlight 3s ease-out; }
 </style>
+<script>
+// Nach dem Bearbeiten: zum zuletzt bearbeiteten Schüler scrollen und kurz hervorheben
+(function () {
+    var params = new URLSearchParams(window.location.search);
+    var hl = params.get('highlight');
+    if (!hl) return;
+    var row = document.getElementById('student-' + hl);
+    if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('row-highlight');
+    }
+})();
+</script>
 {% endblock %}

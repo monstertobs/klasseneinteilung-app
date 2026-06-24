@@ -66,7 +66,7 @@
         Alle
     </button>
     {% for cls in proposal.classes %}
-    {% set class_name = '5' + 'abcdefghijklmnopqrstuvwxyz'[cls.number - 1] %}
+    {% set class_name = cls.name or ('5' + 'abcdefghijklmnopqrstuvwxyz'[cls.number - 1]) %}
     <button class="btn btn-secondary filter-btn" data-filter="{{ class_name }}" onclick="filterClass('{{ class_name }}', this)">
         {{ class_name }}
     </button>
@@ -86,12 +86,13 @@
                 <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Nachname</th>
                 <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Vorname</th>
                 <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Klasse</th>
+                <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Grundschule / Klasse</th>
                 <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Einteilungsgr&uuml;nde</th>
             </tr>
         </thead>
         <tbody id="transparency-tbody">
             {% for cls in proposal.classes %}
-            {% set class_name = '5' + 'abcdefghijklmnopqrstuvwxyz'[cls.number - 1] %}
+            {% set class_name = cls.name or ('5' + 'abcdefghijklmnopqrstuvwxyz'[cls.number - 1]) %}
             {% for student in cls.students | sort(attribute='lastname') %}
             <tr class="transparency-row"
                 data-class="{{ class_name }}"
@@ -101,6 +102,11 @@
                 <td style="padding: 0.65rem 1rem;">{{ student.firstname }}</td>
                 <td style="padding: 0.65rem 1rem;">
                     <span class="badge badge-info">{{ class_name }}</span>
+                </td>
+                <td style="padding: 0.65rem 1rem; font-size: 0.85rem; color: var(--color-text-secondary); white-space: nowrap;">
+                    {% if student.herkunft_schule or student.herkunft_klasse %}
+                    {{ student.herkunft_schule }}{% if student.herkunft_klasse %} <strong style="color: var(--color-text);">{{ student.herkunft_klasse }}</strong>{% endif %}
+                    {% else %}&mdash;{% endif %}
                 </td>
                 <td style="padding: 0.65rem 1rem;">
                     <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">

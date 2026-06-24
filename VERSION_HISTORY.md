@@ -6,6 +6,19 @@
 
 ---
 
+## Version 0.1.66 - Transparenz-Spalte, Klassennamen-Fix, UX-Verbesserungen
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Änderungen nach Feedback des Schulleitungsteams
+1. **Grundschule/Klasse in der Transparenz:** Neue Spalte „Grundschule / Klasse" in der Transparenzliste. Import liest jetzt „abgebendeSchule" und „Klassennamen" (neue DB-Spalten `herkunft_schule`, `herkunft_klasse`). *Hinweis: nur für neu importierte Daten verfügbar.*
+2. **Klassennamen in der Transparenz:** Behoben — die Transparenz zeigte fest „5a/5b…" statt der umbenannten Klassennamen. Jetzt wird der echte Name angezeigt (Filter-Tabs + Klassen-Badge).
+3. **Sprung zum bearbeiteten Schüler:** Nach dem Bearbeiten/Speichern springt die Schülerliste zum betreffenden Schüler (Anker + kurze gelbe Hervorhebung) statt an den Listenanfang.
+4. **Schüler löschen entfernt ihn aus Einteilungen:** Beim Löschen eines Schülers (einzeln/mehrfach/alle) wird er nun auch aus allen gespeicherten Einteilungen entfernt, Statistiken werden neu berechnet, und vorher wird automatisch eine Version gesichert.
+
+---
+
 ## Version 0.1.65 - Papierkorb + automatische Versions-Snapshots
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>
