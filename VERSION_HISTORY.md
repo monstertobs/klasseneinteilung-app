@@ -6,6 +6,17 @@
 
 ---
 
+## Version 0.1.67 - Sprung zum Schüler: Abbrechen + Timing-Fix
+**Release Date:** 19. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Bugfix (Nachbesserung zu 0.1.66 Punkt 3)
+- **Abbrechen** im Bearbeiten-Formular sprang zum Listenanfang — jetzt führt auch „Abbrechen" zurück zum betreffenden Schüler (Anker `#student-<id>` + `highlight`).
+- **Speichern** sprang trotz Anker an den Anfang, weil das Scroll-Script mitten im Seitenaufbau lief und danach vom restlichen Layout zurückgesetzt wurde. Das Script läuft jetzt erst nach dem vollständigen Laden (`window load` + `requestAnimationFrame`), wodurch die Scrollposition stabil beim Schüler bleibt.
+
+---
+
 ## Version 0.1.66 - Transparenz-Spalte, Klassennamen-Fix, UX-Verbesserungen
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

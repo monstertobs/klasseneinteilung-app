@@ -465,16 +465,22 @@ document.addEventListener('keydown', function(e) {
 tr.row-highlight > td { animation: rowHighlight 3s ease-out; }
 </style>
 <script>
-// Nach dem Bearbeiten: zum zuletzt bearbeiteten Schüler scrollen und kurz hervorheben
+// Nach dem Bearbeiten/Abbrechen: zum betreffenden Schüler scrollen und kurz hervorheben.
+// Erst NACH vollständigem Laden ausführen, sonst setzt der spätere Seitenaufbau die
+// Scrollposition wieder zurück.
 (function () {
-    var params = new URLSearchParams(window.location.search);
-    var hl = params.get('highlight');
+    var hl = new URLSearchParams(window.location.search).get('highlight');
     if (!hl) return;
-    var row = document.getElementById('student-' + hl);
-    if (row) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    function jump() {
+        var row = document.getElementById('student-' + hl);
+        if (!row) return;
         row.classList.add('row-highlight');
+        requestAnimationFrame(function () {
+            row.scrollIntoView({ behavior: 'auto', block: 'center' });
+        });
     }
+    if (document.readyState === 'complete') jump();
+    else window.addEventListener('load', jump);
 })();
 </script>
 {% endblock %}
