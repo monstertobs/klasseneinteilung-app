@@ -6,6 +6,20 @@
 
 ---
 
+## Version 0.1.68 - Statistik-Übersicht in den Exporten
+**Release Date:** 25. Juni 2026
+**Author:** Tobias Meier <admin(at)secutobs.com>
+**Status:** ✅ Stable
+
+### Neues Feature (Wunsch der Lehrer)
+- **Klassen-Übersicht in allen Exporten:** Die Statistik-Übersicht aus der App (Geschlecht ♂/♀, Schulform H/R/G/IB, Religion Ethik/Kath./Ev., Sportklasse) erscheint jetzt auch in **Excel, CSV und PDF**.
+  - **Excel:** Übersichts-Block oben in jedem Klassen-Sheet.
+  - **PDF:** Übersicht unter dem Klassentitel.
+  - **CSV:** „KLASSENÜBERSICHT"-Tabelle (eine Zeile pro Klasse mit allen Zahlen) am Anfang, darunter die Schülerliste.
+- Neue Funktion `_class_stats()` berechnet die Zahlen frisch aus den Schülern (immer korrekt, auch nach Verschieben). „Sportklasse" zählt Schüler mit Sportklassen-Häkchen.
+
+---
+
 ## Version 0.1.67 - Sprung zum Schüler: Abbrechen + Timing-Fix
 **Release Date:** 19. Juni 2026
 **Author:** Tobias Meier <admin(at)secutobs.com>

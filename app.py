@@ -1,9 +1,9 @@
 """
 Klasseneinteilung App - Intelligente Klasseneinteilung für 5. Klassen
 
-Version: 0.1.67
+Version: 0.1.68
 Author: Tobias Meier <admin(at)secutobs.com>
-Date: 19. Juni 2026
+Date: 25. Juni 2026
 License: Proprietary - All rights reserved
 
 Description:
@@ -23,7 +23,7 @@ Features:
     - Sicherheits-Features (CSRF, Rate Limiting, sichere Sessions)
 """
 
-__version__ = '0.1.67'
+__version__ = '0.1.68'
 __author__ = 'Tobias Meier'
 __email__ = 'admin(at)secutobs.com'
 
@@ -3668,6 +3668,27 @@ def _class_label(class_data):
     return ('5' + 'abcdefghijklmnopqrstuvwxyz'[num - 1]) if 1 <= num <= 26 else f'Klasse {num}'
 
 
+def _class_stats(class_data):
+    """Statistik-Übersicht einer Klasse, frisch aus den Schülern berechnet
+    (Geschlecht, Schulform, Religion, Sportklassen-Wunsch)."""
+    students = class_data.get('students', [])
+    def c(pred):
+        return sum(1 for s in students if pred(s))
+    return {
+        'total': len(students),
+        'm': c(lambda s: s.get('gender') == 'm'),
+        'w': c(lambda s: s.get('gender') == 'w'),
+        'H': c(lambda s: s.get('schulform') == 'H'),
+        'R': c(lambda s: s.get('schulform') == 'R'),
+        'G': c(lambda s: s.get('schulform') == 'G'),
+        'IB': c(lambda s: s.get('schulform') == 'IB'),
+        'ethik': c(lambda s: (s.get('religion') or '') == 'ethik'),
+        'kath': c(lambda s: s.get('religion') == 'katholisch'),
+        'ev': c(lambda s: s.get('religion') == 'evangelisch'),
+        'sport': c(lambda s: s.get('sport_interesse')),
+    }
+
+
 def generate_excel_export(proposal):
     """Generiert Excel-Export"""
     from openpyxl import Workbook
@@ -3696,25 +3717,26 @@ def generate_excel_export(proposal):
         ws['A1'].font = Font(size=14, bold=True)
         ws.merge_cells('A1:D1')
 
-        # Statistiken
-        ws['A3'] = 'Statistiken:'
+        # Statistik-Übersicht (Geschlecht, Schulform, Religion, Sport)
+        st = _class_stats(class_data)
+        ws['A3'] = 'Übersicht:'
         ws['A3'].font = Font(bold=True)
-        ws['A4'] = f"Gesamt: {class_data['count']} Schüler"
-        ws['A5'] = f"Männlich: {class_data['gender_count']['m']}"
-        ws['A6'] = f"Weiblich: {class_data['gender_count']['w']}"
-
-        if class_data.get('schulform_count'):
-            row = 8
-            ws[f'A{row}'] = 'Schulformen:'
-            ws[f'A{row}'].font = Font(bold=True)
+        overview = [
+            ('Gesamt', f"{st['total']} Schüler"),
+            ('Geschlecht', f"♂ {st['m']}   ♀ {st['w']}"),
+            ('Schulform', f"H {st['H']}   R {st['R']}   G {st['G']}   IB {st['IB']}"),
+            ('Religion', f"Ethik {st['ethik']}   Kath. {st['kath']}   Ev. {st['ev']}"),
+            ('Sportklasse', str(st['sport'])),
+        ]
+        row = 4
+        for label, value in overview:
+            ws[f'A{row}'] = label
+            ws[f'A{row}'].font = Font(bold=True, color='6C757D')
+            ws[f'B{row}'] = value
             row += 1
-            for sf, count in class_data['schulform_count'].items():
-                if count > 0 and sf:
-                    ws[f'A{row}'] = f"{sf}: {count}"
-                    row += 1
 
         # Schülerliste Header
-        start_row = 14
+        start_row = 12
         ws[f'A{start_row}'] = 'Nachname'
         ws[f'B{start_row}'] = 'Vorname'
         ws[f'C{start_row}'] = 'Geschlecht'
@@ -3768,7 +3790,18 @@ def generate_csv_export(proposal):
     output = StringIO()
     writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
 
-    # Header
+    # --- Klassenübersicht (Geschlecht, Schulform, Religion, Sport) ---
+    writer.writerow(['KLASSENÜBERSICHT'])
+    writer.writerow(['Klasse', 'Gesamt', 'Männlich', 'Weiblich', 'H', 'R', 'G', 'IB',
+                     'Ethik', 'Kath.', 'Ev.', 'Sportklasse'])
+    for class_data in proposal['classes']:
+        st = _class_stats(class_data)
+        writer.writerow([_class_label(class_data), st['total'], st['m'], st['w'],
+                         st['H'], st['R'], st['G'], st['IB'],
+                         st['ethik'], st['kath'], st['ev'], st['sport']])
+    writer.writerow([])  # Leerzeile als Trenner
+
+    # --- Schülerliste ---
     writer.writerow(['Klasse', 'Nachname', 'Vorname', 'Geschlecht', 'Schulform', 'IB', 'Wohnort', 'Religion'])
 
     # Schüler pro Klasse
@@ -3840,14 +3873,17 @@ def generate_pdf_export(proposal):
         # Titel
         elements.append(Paragraph(class_name, title_style))
 
-        # Statistiken
+        # Statistik-Übersicht (Geschlecht, Schulform, Religion, Sport)
+        st = _class_stats(class_data)
         stats_data = [
-            ['Gesamt:', f"{class_data['count']} Schueler"],
-            ['Maennlich:', str(class_data['gender_count']['m'])],
-            ['Weiblich:', str(class_data['gender_count']['w'])]
+            ['Gesamt:', f"{st['total']} Schueler"],
+            ['Geschlecht:', f"m {st['m']}    w {st['w']}"],
+            ['Schulform:', f"H {st['H']}    R {st['R']}    G {st['G']}    IB {st['IB']}"],
+            ['Religion:', f"Ethik {st['ethik']}    Kath. {st['kath']}    Ev. {st['ev']}"],
+            ['Sportklasse:', str(st['sport'])],
         ]
 
-        stats_table = Table(stats_data, colWidths=[4*cm, 4*cm])
+        stats_table = Table(stats_data, colWidths=[3.5*cm, 12*cm])
         stats_table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
